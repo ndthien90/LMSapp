@@ -1,0 +1,863 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduBattle - Học Tập & Thi Đấu</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome cho Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body { font-family: 'Roboto', sans-serif; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #888; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 min-h-screen">
+
+    <div id="app" class="min-h-screen">
+        <!-- Nội dung sẽ được render bởi JavaScript -->
+        <div class="flex items-center justify-center h-screen">
+            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+        </div>
+    </div>
+
+    <!-- Firebase SDKs -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+        import { 
+            getAuth, 
+            signInAnonymously, 
+            onAuthStateChanged,
+            signInWithCustomToken,
+            signOut
+        } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+        import { 
+            getFirestore, 
+            collection, 
+            doc, 
+            setDoc, 
+            addDoc, 
+            getDocs, 
+            onSnapshot, 
+            query, 
+            where, 
+            orderBy, 
+            updateDoc, 
+            serverTimestamp 
+        } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+
+        // --- 1. SETUP FIREBASE ---
+        // Cấu hình Firebase (Lấy từ biến toàn cục của Canvas)
+        let appId;
+         let firebaseConfig;
+        // --- KHỞI TẠO VÀ CẤU HÌNH FIREBASE ---
+        try {
+            if (typeof __firebase_config !== 'undefined') {
+                firebaseConfig = JSON.parse(__firebase_config);
+            } else {
+                // Cấu hình dự phòng nếu không có __firebase_config
+                firebaseConfig = {
+    		apiKey: "AIzaSyCjk2GSw5sVSsnhSnu0zeCdM7Fy06na92o",
+    		authDomain: "qlhsapp.firebaseapp.com",
+    		projectId: "qlhsapp",
+    		storageBucket: "qlhsapp.firebasestorage.app",
+    		messagingSenderId: "267919381815",
+    		appId: "1:267919381815:web:6b0f469e6492a9c87636b2",
+   		measurementId: "G-ZZPSRHR0Z7"
+                };
+            }
+            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        } catch (e) {
+            console.error("Lỗi cấu hình Firebase:", e);
+            firebaseConfig = {};
+        }
+
+        
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        //const appId = typeof window.__app_id !== 'undefined' ? window.__app_id : 'edubattle-html';
+
+        // Helper Paths
+        const getPublicCollection = (colName) => collection(db, 'artifacts', appId, 'public', 'data', colName);
+        const COLLECTIONS = {
+            USERS: 'users',
+            ASSIGNMENTS: 'assignments',
+            SUBMISSIONS: 'submissions',
+            MATCHES: 'matches'
+        };
+
+        // --- 2. GLOBAL STATE ---
+        const state = {
+            user: null,
+            profile: null,
+            view: 'loading', // loading, auth, dashboard, assignments, competition, leaderboard
+            unsubscribes: [], // Để cleanup listener khi chuyển view
+            currentMatchId: null // Cho module thi đấu
+        };
+
+        const ROLES = {
+            STUDENT: 'student',
+            TEACHER: 'teacher',
+            ADMIN: 'admin'
+        };
+
+        // --- 3. CORE FUNCTIONS ---
+
+        // Cleanup function để hủy các listener realtime cũ
+        function cleanupListeners() {
+            state.unsubscribes.forEach(unsub => unsub());
+            state.unsubscribes = [];
+        }
+
+        // Main Router/Renderer
+        function render() {
+            const appDiv = document.getElementById('app');
+            appDiv.innerHTML = ''; // Clear content
+
+            if (state.view === 'loading') {
+                appDiv.innerHTML = `
+                    <div class="flex items-center justify-center h-screen">
+                        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-blue-600"></div>
+                    </div>`;
+                return;
+            }
+
+            if (state.view === 'auth') {
+                renderAuthScreen(appDiv);
+                return;
+            }
+
+            // Layout chính (Sidebar + Content)
+            const layout = document.createElement('div');
+            layout.className = "flex min-h-screen fade-in";
+            
+            // Sidebar
+            layout.innerHTML = `
+                <aside class="w-16 md:w-64 bg-white shadow-xl flex flex-col fixed h-full z-10 transition-all duration-300">
+                    <div class="p-4 md:p-6 flex items-center justify-center md:justify-start gap-3 border-b">
+                        <div class="bg-blue-600 text-white p-2 rounded-lg"><i class="fas fa-th-large"></i></div>
+                        <span class="hidden md:block font-bold text-xl tracking-tight text-blue-900">EduBattle</span>
+                    </div>
+                    
+                    <nav class="flex-1 p-2 md:p-4 space-y-2">
+                        ${navItem('dashboard', 'Tổng quan', 'fa-chart-pie')}
+                        ${navItem('assignments', 'Bài tập', 'fa-book-open')}
+                        ${state.profile.role === ROLES.STUDENT ? navItem('competition', 'Thi đấu', 'fa-swords') : ''}
+                        ${navItem('leaderboard', 'Xếp hạng', 'fa-trophy')}
+                    </nav>
+
+                    <div class="p-4 border-t">
+                        <button id="btn-logout" class="flex items-center gap-3 text-red-500 hover:bg-red-50 p-3 rounded-lg w-full transition">
+                            <i class="fas fa-sign-out-alt w-6 text-center"></i>
+                            <span class="hidden md:block font-medium">Đăng xuất</span>
+                        </button>
+                    </div>
+                </aside>
+                <main id="main-content" class="flex-1 ml-16 md:ml-64 p-4 md:p-8 bg-gray-50">
+                    <!-- Dynamic Content Here -->
+                </main>
+            `;
+
+            appDiv.appendChild(layout);
+            
+            // Bind Logout
+            document.getElementById('btn-logout').addEventListener('click', async () => {
+                await signOut(auth);
+                location.reload();
+            });
+
+            // Bind Navigation
+            document.querySelectorAll('.nav-link').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    // Cleanup competition state if leaving competition view
+                    if(state.view === 'competition' && btn.dataset.view !== 'competition') {
+                        cleanupListeners();
+                        state.currentMatchId = null;
+                    }
+                    
+                    state.view = btn.dataset.view;
+                    render();
+                });
+            });
+
+            const mainContent = document.getElementById('main-content');
+            
+            switch(state.view) {
+                case 'dashboard': renderDashboard(mainContent); break;
+                case 'assignments': renderAssignments(mainContent); break;
+                case 'competition': renderCompetition(mainContent); break;
+                case 'leaderboard': renderLeaderboard(mainContent); break;
+            }
+        }
+
+        function navItem(viewName, label, iconClass) {
+            const isActive = state.view === viewName;
+            const activeClass = isActive ? 'bg-blue-50 text-blue-700 font-semibold' : 'text-gray-500 hover:bg-gray-100 hover:text-gray-900';
+            const iconColor = isActive ? 'text-blue-600' : 'text-gray-400';
+            
+            // Fix fontawesome icon name specifically for 'swords' if not free, fallback to 'gamepad'
+            if (iconClass === 'fa-swords') iconClass = 'fa-gamepad';
+
+            return `
+                <button data-view="${viewName}" class="nav-link flex items-center w-full p-3 rounded-lg transition-all duration-200 group ${activeClass}">
+                    <i class="fas ${iconClass} w-6 text-center ${iconColor}"></i>
+                    <span class="ml-3 hidden md:block">${label}</span>
+                </button>
+            `;
+        }
+
+        // --- 4. MODULES ---
+
+        // === MODULE: AUTHENTICATION ===
+        function renderAuthScreen(container) {
+            container.innerHTML = `
+                <div class="min-h-screen flex items-center justify-center bg-gray-100 p-4">
+                    <div class="bg-white p-8 rounded-xl shadow-lg w-full max-w-md fade-in">
+                        <h1 class="text-3xl font-bold text-center text-blue-600 mb-6">EduBattle Login</h1>
+                        <form id="auth-form" class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Email (Giả lập)</label>
+                                <input id="auth-email" required type="email" class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm p-2 focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Họ và tên</label>
+                                <input id="auth-name" required type="text" class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm p-2">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700">Vai trò</label>
+                                <select id="auth-role" class="mt-1 block w-full rounded-md border border-gray-300 shadow-sm p-2">
+                                    <option value="${ROLES.STUDENT}">Học sinh</option>
+                                    <option value="${ROLES.TEACHER}">Giáo viên</option>
+                                    <option value="${ROLES.ADMIN}">Quản trị viên</option>
+                                </select>
+                            </div>
+                            <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition font-bold">
+                                Bắt đầu ngay
+                            </button>
+                        </form>
+                        <p class="text-xs text-gray-500 text-center mt-4">Hệ thống sử dụng xác thực ẩn danh kết hợp hồ sơ giả lập.</p>
+                    </div>
+                </div>
+            `;
+
+            document.getElementById('auth-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const email = document.getElementById('auth-email').value;
+                const name = document.getElementById('auth-name').value;
+                const role = document.getElementById('auth-role').value;
+                
+                // Show loading
+                e.target.querySelector('button').innerText = 'Đang xử lý...';
+                e.target.querySelector('button').disabled = true;
+
+                try {
+                    // Check logic login/register simulated
+                    const usersRef = getPublicCollection(COLLECTIONS.USERS);
+                    const q = query(usersRef, where("email", "==", email));
+                    const snapshot = await getDocs(q);
+
+                    // Auth Firebase
+                    let userCredential;
+                    if (window.__initial_auth_token) {
+                         userCredential = await signInWithCustomToken(auth, window.__initial_auth_token);
+                    } else {
+                         userCredential = await signInAnonymously(auth);
+                    }
+                    const uid = userCredential.user.uid;
+
+                    // Nếu user chưa tồn tại trong DB thì tạo mới
+                    if (snapshot.empty) {
+                        await setDoc(doc(getPublicCollection(COLLECTIONS.USERS), uid), {
+                            uid, name, email, role,
+                            points: 0,
+                            classId: 'Class-10A',
+                            createdAt: serverTimestamp()
+                        });
+                    } else {
+                        // Nếu tồn tại, update lại thông tin phiên này (cho demo mượt mà)
+                        const existingDoc = snapshot.docs[0];
+                        // Nếu user auth hiện tại khác user tìm thấy (do anonymous ID đổi), 
+                        // trong thực tế cần luồng login pass. Ở đây ta giả sử anonymous user mới là user cũ.
+                        if (existingDoc.id !== uid) {
+                            // Copy data sang uid mới (Hack cho demo anonymous)
+                            await setDoc(doc(getPublicCollection(COLLECTIONS.USERS), uid), {
+                                ...existingDoc.data(),
+                                uid: uid // update uid
+                            });
+                        }
+                    }
+                    // Listener onAuthStateChanged sẽ tự handle chuyển trang
+                } catch (err) {
+                    alert('Lỗi: ' + err.message);
+                    location.reload();
+                }
+            });
+        }
+
+        // === MODULE: DASHBOARD ===
+        function renderDashboard(container) {
+            container.innerHTML = `
+                <header class="mb-8">
+                    <h1 class="text-3xl font-bold text-gray-800">Xin chào, ${state.profile.name}! 👋</h1>
+                    <p class="text-gray-500 mt-2">
+                        Vai trò: <span class="uppercase font-bold text-blue-600 bg-blue-100 px-2 py-1 rounded text-xs">${state.profile.role}</span> 
+                        <span class="mx-2">|</span> 
+                        Điểm tích lũy: <span class="font-bold text-yellow-600 text-xl">${state.profile.points || 0}</span>
+                    </p>
+                </header>
+
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div onclick="navigateTo('assignments')" class="bg-blue-600 text-white p-6 rounded-xl shadow-lg cursor-pointer hover:bg-blue-700 transition transform hover:-translate-y-1">
+                        <i class="fas fa-book-open text-4xl mb-4 opacity-80"></i>
+                        <h3 class="text-xl font-bold mb-1">Bài tập</h3>
+                        <p class="opacity-80 text-sm">Xem và làm bài tập được giao.</p>
+                    </div>
+
+                    ${state.profile.role === ROLES.STUDENT ? `
+                    <div onclick="navigateTo('competition')" class="bg-purple-600 text-white p-6 rounded-xl shadow-lg cursor-pointer hover:bg-purple-700 transition transform hover:-translate-y-1">
+                        <i class="fas fa-gamepad text-4xl mb-4 opacity-80"></i>
+                        <h3 class="text-xl font-bold mb-1">Thi đấu</h3>
+                        <p class="opacity-80 text-sm">Thách đấu 1v1 thời gian thực.</p>
+                    </div>` : ''}
+
+                    <div onclick="navigateTo('leaderboard')" class="bg-orange-500 text-white p-6 rounded-xl shadow-lg cursor-pointer hover:bg-orange-600 transition transform hover:-translate-y-1">
+                        <i class="fas fa-trophy text-4xl mb-4 opacity-80"></i>
+                        <h3 class="text-xl font-bold mb-1">Xếp hạng</h3>
+                        <p class="opacity-80 text-sm">Xem bảng vàng thành tích.</p>
+                    </div>
+                </div>
+            `;
+            // Helper để dùng onclick inline
+            window.navigateTo = (view) => {
+                state.view = view;
+                render();
+            };
+        }
+
+        // === MODULE: ASSIGNMENTS ===
+        function renderAssignments(container) {
+            container.innerHTML = `
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-bold text-gray-800">Danh sách bài tập</h2>
+                    ${state.profile.role === ROLES.TEACHER ? 
+                        `<button id="btn-create-assign" class="flex items-center gap-2 bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 shadow">
+                            <i class="fas fa-plus-circle"></i> Tạo bài tập
+                        </button>` : ''}
+                </div>
+                <div id="create-assignment-area" class="mb-8 hidden"></div>
+                <div id="assignment-list" class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div class="col-span-3 text-center py-10 text-gray-500">Đang tải...</div>
+                </div>
+            `;
+
+            // Logic Tạo bài tập (Cho Giáo viên)
+            if (state.profile.role === ROLES.TEACHER) {
+                const btnCreate = document.getElementById('btn-create-assign');
+                const createArea = document.getElementById('create-assignment-area');
+                
+                btnCreate.addEventListener('click', () => {
+                    createArea.classList.remove('hidden');
+                    createArea.innerHTML = `
+                        <div class="bg-white p-6 rounded-lg shadow-md border border-gray-200 fade-in">
+                            <h3 class="text-lg font-bold mb-4 text-blue-800">Soạn thảo bài tập mới</h3>
+                            <input id="new-assign-title" class="w-full mb-3 p-2 border rounded" placeholder="Tiêu đề bài tập">
+                            <textarea id="new-assign-desc" class="w-full mb-4 p-2 border rounded" placeholder="Mô tả hướng dẫn..."></textarea>
+                            
+                            <div id="questions-container" class="space-y-4 mb-4"></div>
+                            
+                            <div class="flex gap-2 mb-4">
+                                <button id="btn-add-q" class="px-3 py-1 bg-gray-200 rounded hover:bg-gray-300 text-sm font-medium text-gray-700">+ Thêm câu hỏi</button>
+                            </div>
+                            
+                            <div class="flex justify-end gap-3 pt-4 border-t">
+                                <button onclick="document.getElementById('create-assignment-area').classList.add('hidden')" class="px-4 py-2 text-gray-600">Hủy</button>
+                                <button id="btn-save-assign" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 font-bold">Đăng bài</button>
+                            </div>
+                        </div>
+                    `;
+
+                    let questions = [];
+                    const addQuestionUI = () => {
+                        questions.push({ q: '', options: ['', '', '', ''], correct: 0 });
+                        renderQuestions();
+                    };
+
+                    const renderQuestions = () => {
+                        const qContainer = document.getElementById('questions-container');
+                        qContainer.innerHTML = questions.map((q, i) => `
+                            <div class="p-4 bg-gray-50 rounded border border-gray-200 relative">
+                                <span class="absolute top-2 right-2 text-xs font-bold text-gray-400">Câu ${i + 1}</span>
+                                <input class="w-full mb-2 p-2 border rounded text-sm font-medium" placeholder="Nội dung câu hỏi" value="${q.q}" onchange="updateQ(${i}, 'q', this.value)">
+                                <div class="grid grid-cols-2 gap-2">
+                                    ${q.options.map((opt, oIdx) => `
+                                        <div class="flex items-center gap-2">
+                                            <input type="radio" name="q-${i}" ${q.correct === oIdx ? 'checked' : ''} onchange="updateQ(${i}, 'correct', ${oIdx})">
+                                            <input class="w-full p-1 border rounded text-xs" placeholder="Đáp án ${oIdx+1}" value="${opt}" onchange="updateQ(${i}, 'opt', this.value, ${oIdx})">
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `).join('');
+                    };
+
+                    // Global helper for inline events inside template string
+                    window.updateQ = (idx, type, val, optIdx) => {
+                        if (type === 'q') questions[idx].q = val;
+                        if (type === 'correct') questions[idx].correct = val;
+                        if (type === 'opt') questions[idx].options[optIdx] = val;
+                    };
+
+                    document.getElementById('btn-add-q').addEventListener('click', addQuestionUI);
+                    addQuestionUI(); // Add first default question
+
+                    document.getElementById('btn-save-assign').addEventListener('click', async () => {
+                        const title = document.getElementById('new-assign-title').value;
+                        const desc = document.getElementById('new-assign-desc').value;
+                        if (!title || questions.length === 0) return alert("Vui lòng nhập tiêu đề và ít nhất 1 câu hỏi");
+
+                        await addDoc(getPublicCollection(COLLECTIONS.ASSIGNMENTS), {
+                            title, description: desc, questions,
+                            createdBy: state.profile.uid,
+                            teacherName: state.profile.name,
+                            classId: state.profile.classId,
+                            createdAt: serverTimestamp()
+                        });
+                        createArea.classList.add('hidden');
+                        alert("Đã tạo bài tập thành công!");
+                    });
+                });
+            }
+
+            // Load danh sách bài tập
+            const q = query(getPublicCollection(COLLECTIONS.ASSIGNMENTS), orderBy('createdAt', 'desc'));
+            const unsub = onSnapshot(q, (snap) => {
+                const listDiv = document.getElementById('assignment-list');
+                if (snap.empty) {
+                    listDiv.innerHTML = '<p class="col-span-3 text-center py-10 text-gray-500">Chưa có bài tập nào.</p>';
+                    return;
+                }
+                listDiv.innerHTML = snap.docs.map(d => {
+                    const data = d.data();
+                    return `
+                        <div class="bg-white p-5 rounded-lg shadow border border-gray-100 hover:shadow-md transition">
+                            <div class="flex justify-between items-start">
+                                <h3 class="font-bold text-lg text-blue-800">${data.title}</h3>
+                                <span class="text-xs bg-gray-100 text-gray-600 px-2 py-1 rounded font-mono">${data.questions?.length || 0} câu</span>
+                            </div>
+                            <p class="text-gray-500 text-sm mt-1 mb-4 line-clamp-2">${data.description || ''}</p>
+                            <div class="flex justify-between items-center text-sm text-gray-500 border-t pt-3">
+                                <span><i class="fas fa-chalkboard-teacher mr-1"></i> ${data.teacherName}</span>
+                            </div>
+                            ${state.profile.role === ROLES.STUDENT ? 
+                                `<button onclick="startQuiz('${d.id}')" class="mt-4 w-full bg-blue-100 text-blue-700 py-2 rounded font-medium hover:bg-blue-200 transition">
+                                    Làm bài ngay
+                                </button>` : ''}
+                        </div>
+                    `;
+                }).join('');
+                
+                // Lưu data assignments vào window để dùng khi startQuiz
+                window.assignmentsCache = snap.docs.reduce((acc, d) => ({...acc, [d.id]: d.data()}), {});
+            });
+            state.unsubscribes.push(unsub);
+
+            // Logic Làm bài (Modal)
+            window.startQuiz = (assignId) => {
+                const assign = window.assignmentsCache[assignId];
+                const modal = document.createElement('div');
+                modal.className = "fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4";
+                modal.innerHTML = `
+                    <div class="bg-white rounded-xl shadow-2xl w-full max-w-3xl h-[90vh] flex flex-col overflow-hidden animate-fade-in-up">
+                        <div class="p-6 border-b flex justify-between items-center bg-gray-50">
+                            <div>
+                                <h2 class="text-xl font-bold text-gray-800">${assign.title}</h2>
+                                <p class="text-sm text-gray-500">Giáo viên: ${assign.teacherName}</p>
+                            </div>
+                            <button id="close-quiz" class="text-gray-400 hover:text-gray-600"><i class="fas fa-times text-2xl"></i></button>
+                        </div>
+                        <div class="flex-1 overflow-y-auto p-6 bg-gray-50">
+                            <div id="quiz-content" class="space-y-6">
+                                ${assign.questions.map((q, idx) => `
+                                    <div class="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
+                                        <p class="font-medium text-lg mb-4 text-gray-800"><span class="font-bold text-blue-600">Câu ${idx+1}:</span> ${q.q}</p>
+                                        <div class="space-y-2">
+                                            ${q.options.map((opt, oIdx) => `
+                                                <label class="flex items-center p-3 rounded-lg border border-gray-200 cursor-pointer hover:bg-blue-50 transition quiz-option-label" data-q="${idx}">
+                                                    <input type="radio" name="qz-${idx}" value="${oIdx}" class="mr-3 h-4 w-4 text-blue-600">
+                                                    <span>${opt}</span>
+                                                </label>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                        <div class="p-6 border-t bg-white">
+                            <button id="submit-quiz" class="w-full bg-blue-600 text-white py-3 rounded-lg text-lg font-bold hover:bg-blue-700 shadow-lg transition">Nộp bài</button>
+                        </div>
+                    </div>
+                `;
+                document.body.appendChild(modal);
+
+                // Handle Close
+                document.getElementById('close-quiz').onclick = () => modal.remove();
+
+                // Handle Submit
+                document.getElementById('submit-quiz').onclick = async () => {
+                    const answers = {};
+                    let correctCount = 0;
+                    
+                    // Collect answers
+                    assign.questions.forEach((q, idx) => {
+                        const selected = document.querySelector(`input[name="qz-${idx}"]:checked`);
+                        if (selected) {
+                            const val = parseInt(selected.value);
+                            answers[idx] = val;
+                            if (val === q.correct) correctCount++;
+                        }
+                    });
+
+                    const score = (correctCount / assign.questions.length) * 10;
+                    
+                    // UI Result
+                    const quizContent = document.getElementById('quiz-content');
+                    quizContent.innerHTML = `
+                        <div class="text-center py-10">
+                            <div class="inline-block p-6 rounded-full bg-yellow-100 text-yellow-600 mb-6">
+                                <i class="fas fa-trophy text-6xl"></i>
+                            </div>
+                            <h2 class="text-3xl font-bold mb-2 text-gray-800">Hoàn thành bài tập!</h2>
+                            <p class="text-xl text-gray-600 mb-8">Điểm số của bạn: <span class="text-blue-600 font-bold text-4xl block mt-2">${score.toFixed(1)} / 10</span></p>
+                            <div class="bg-gray-100 p-4 rounded-lg inline-block text-left text-sm text-gray-600">
+                                <p>✅ Số câu đúng: ${correctCount}</p>
+                                <p>📊 Tổng số câu: ${assign.questions.length}</p>
+                            </div>
+                        </div>
+                    `;
+                    document.querySelector('#submit-quiz').parentElement.remove(); // Remove submit button area
+
+                    // Save to Firestore
+                    await addDoc(getPublicCollection(COLLECTIONS.SUBMISSIONS), {
+                        assignmentId: assignId,
+                        studentId: state.profile.uid,
+                        studentName: state.profile.name,
+                        answers,
+                        score,
+                        submittedAt: serverTimestamp()
+                    });
+                    
+                    // Update user points
+                    const userRef = doc(getPublicCollection(COLLECTIONS.USERS), state.profile.uid);
+                    await updateDoc(userRef, {
+                        points: (state.profile.points || 0) + score
+                    });
+                };
+            };
+        }
+
+        // === MODULE: COMPETITION (ARENA) ===
+        function renderCompetition(container) {
+            container.innerHTML = `
+                <div id="arena-lobby" class="flex flex-col items-center justify-center py-20 fade-in">
+                    <div class="bg-gradient-to-r from-purple-500 to-indigo-600 p-8 rounded-full mb-8 text-white shadow-xl animate-pulse">
+                        <i class="fas fa-gamepad text-6xl"></i>
+                    </div>
+                    <h2 class="text-3xl font-bold mb-2 text-gray-800">Đấu trường trí tuệ 1v1</h2>
+                    <p class="text-gray-500 mb-8 max-w-md text-center">Thi đấu thời gian thực với các học sinh khác. Trả lời đúng và nhanh để giành chiến thắng!</p>
+                    <button id="btn-find-match" class="bg-indigo-600 text-white px-10 py-4 rounded-full font-bold text-xl hover:bg-indigo-700 shadow-xl transition transform hover:scale-105">
+                        <i class="fas fa-search mr-2"></i> Tìm trận đấu
+                    </button>
+                    <div id="matching-status" class="mt-4 text-indigo-600 font-medium hidden">
+                        <i class="fas fa-spinner fa-spin mr-2"></i> Đang tìm đối thủ...
+                    </div>
+                </div>
+                <div id="arena-game" class="hidden max-w-4xl mx-auto">
+                    <!-- Game content rendered by JS -->
+                </div>
+            `;
+
+            document.getElementById('btn-find-match').addEventListener('click', async () => {
+                const btn = document.getElementById('btn-find-match');
+                const status = document.getElementById('matching-status');
+                btn.classList.add('hidden');
+                status.classList.remove('hidden');
+
+                // Logic tìm trận
+                const matchesRef = getPublicCollection(COLLECTIONS.MATCHES);
+                const q = query(matchesRef, where('status', '==', 'waiting'));
+                const snapshot = await getDocs(q);
+
+                // Mock questions
+                const arenaQuestions = [
+                    { q: "12 + 15 = ?", options: ["25", "27", "28", "30"], correct: 1 },
+                    { q: "Thủ đô của Nhật Bản?", options: ["Seoul", "Bắc Kinh", "Tokyo", "Bangkok"], correct: 2 },
+                    { q: "Con vật nào là vua rừng xanh?", options: ["Sư tử", "Hổ", "Voi", "Gấu"], correct: 0 },
+                    { q: "5 x 8 = ?", options: ["35", "40", "45", "42"], correct: 1 }
+                ];
+
+                let matchId;
+                if (!snapshot.empty) {
+                    const matchDoc = snapshot.docs[0];
+                    if (matchDoc.data().player1.uid !== state.profile.uid) {
+                        // Join
+                        matchId = matchDoc.id;
+                        await updateDoc(doc(matchesRef, matchId), {
+                            player2: { uid: state.profile.uid, name: state.profile.name, score: 0 },
+                            status: 'playing',
+                            startTime: serverTimestamp()
+                        });
+                    }
+                }
+                
+                if (!matchId) {
+                    // Create new
+                    const docRef = await addDoc(matchesRef, {
+                        player1: { uid: state.profile.uid, name: state.profile.name, score: 0 },
+                        player2: null,
+                        status: 'waiting',
+                        questions: arenaQuestions,
+                        createdAt: serverTimestamp()
+                    });
+                    matchId = docRef.id;
+                }
+
+                state.currentMatchId = matchId;
+                startMatchListener(matchId);
+            });
+        }
+
+        function startMatchListener(matchId) {
+            const unsub = onSnapshot(doc(getPublicCollection(COLLECTIONS.MATCHES), matchId), (snap) => {
+                if (!snap.exists()) return;
+                const data = snap.data();
+                
+                // Render Game Interface
+                const lobby = document.getElementById('arena-lobby');
+                const gameDiv = document.getElementById('arena-game');
+                
+                if (lobby) lobby.classList.add('hidden');
+                if (gameDiv) {
+                    gameDiv.classList.remove('hidden');
+                    
+                    if (data.status === 'waiting') {
+                        gameDiv.innerHTML = `
+                            <div class="flex flex-col items-center justify-center h-64 bg-white rounded-xl shadow p-8 text-center">
+                                <div class="loader mb-4"></div> 
+                                <h3 class="text-xl font-bold text-gray-700">Đang đợi người chơi khác tham gia...</h3>
+                                <p class="text-gray-500">Mã phòng: ${matchId.substr(0, 6)}</p>
+                            </div>
+                        `;
+                    } else if (data.status === 'playing') {
+                        // Determine roles
+                        const amIPlayer1 = data.player1.uid === state.profile.uid;
+                        const myData = amIPlayer1 ? data.player1 : data.player2;
+                        const oppData = amIPlayer1 ? data.player2 : data.player1;
+                        
+                        // Local state for current question index (simplification: store in DOM or memory)
+                        if (typeof window.currentQIdx === 'undefined') window.currentQIdx = 0;
+                        
+                        // Check if finished locally
+                        if (window.currentQIdx >= data.questions.length) {
+                             gameDiv.innerHTML = renderGameResult(myData.score, oppData.score);
+                             return;
+                        }
+
+                        const q = data.questions[window.currentQIdx];
+
+                        gameDiv.innerHTML = `
+                            <div class="grid grid-cols-3 gap-4 mb-6 text-white">
+                                <div class="bg-blue-600 p-4 rounded-xl text-center shadow-lg">
+                                    <p class="text-sm opacity-80">Bạn</p>
+                                    <p class="text-3xl font-bold">${myData.score}</p>
+                                </div>
+                                <div class="flex items-center justify-center">
+                                    <div class="bg-gray-800 text-white px-4 py-2 rounded-full font-mono font-bold">VS</div>
+                                </div>
+                                <div class="bg-red-500 p-4 rounded-xl text-center shadow-lg">
+                                    <p class="text-sm opacity-80">${oppData.name}</p>
+                                    <p class="text-3xl font-bold">${oppData.score}</p>
+                                </div>
+                            </div>
+                            
+                            <div class="bg-white p-8 rounded-xl shadow-lg border-t-4 border-indigo-500">
+                                <div class="flex justify-between text-gray-400 text-sm mb-4">
+                                    <span>Câu hỏi ${window.currentQIdx + 1} / ${data.questions.length}</span>
+                                    <span><i class="fas fa-clock"></i> Realtime</span>
+                                </div>
+                                <h3 class="text-2xl font-bold text-gray-800 text-center mb-8">${q.q}</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    ${q.options.map((opt, idx) => `
+                                        <button onclick="answerMatch(${idx}, ${q.correct}, '${matchId}', ${amIPlayer1}, ${myData.score})" 
+                                            class="p-4 bg-gray-50 hover:bg-indigo-100 border-2 border-transparent hover:border-indigo-500 rounded-lg font-medium transition text-lg text-gray-700">
+                                            ${opt}
+                                        </button>
+                                    `).join('')}
+                                </div>
+                            </div>
+                        `;
+                    }
+                }
+            });
+            state.unsubscribes.push(unsub);
+        }
+
+        window.answerMatch = async (idx, correctIdx, matchId, amIPlayer1, currentScore) => {
+            // Check correct
+            if (idx === correctIdx) {
+                const newScore = currentScore + 10;
+                const field = amIPlayer1 ? "player1.score" : "player2.score";
+                await updateDoc(doc(getPublicCollection(COLLECTIONS.MATCHES), matchId), {
+                    [field]: newScore
+                });
+            }
+            // Next question
+            window.currentQIdx++;
+            // Note: In a real app, 'currentQIdx' should be synchronized or handled carefully. 
+            // Here we rely on the realtime listener re-rendering the UI which reads window.currentQIdx
+            // Force re-read of logic inside snapshot by triggering a null update or just waiting for score update.
+            // But since score might not update if answer is wrong, we manually trigger a UI refresh logic or just wait.
+            // For simplicity in this vanilla html, we assume the snapshot listener will fire or we call a redraw if needed.
+            // Actually, since we modified window.currentQIdx, we need the UI to update to the new question.
+            // Since we don't have React, we rely on the listener. 
+            // If answer is wrong (no DB update), the listener won't fire. We must force check.
+            
+            // Hack: trigger a dummy update or simply re-fetch doc, or better yet, just wait for next snapshot? 
+            // If answer is wrong, no snapshot change. So UI won't change.
+            // We should reload the UI content manually for the next question immediately.
+            
+            // Re-render UI locally by reading the *last known* data or simply waiting? 
+            // Let's just update a dummy field to force propagation for now to keep it simple sync.
+            // Or better: call the render logic again with cached data?
+            // Let's just update a timestamp in the doc to force everyone to re-render? No that's spammy.
+            // Correct way: The UI logic inside startMatchListener handles rendering based on window.currentQIdx.
+            // We just need to trigger it.
+            
+            // Quick fix: Since we can't easily re-invoke the snapshot callback, let's just update a dummy field "lastAction"
+            await updateDoc(doc(getPublicCollection(COLLECTIONS.MATCHES), matchId), {
+                lastAction: serverTimestamp()
+            });
+        };
+
+        function renderGameResult(myScore, oppScore) {
+            const isWinner = myScore > oppScore;
+            // Reset for next time
+            window.currentQIdx = 0; 
+            
+            return `
+                <div class="text-center py-16 bg-white rounded-xl shadow-xl animate-fade-in-up">
+                    <div class="mb-6 inline-block">
+                        ${isWinner ? '<i class="fas fa-crown text-6xl text-yellow-500"></i>' : '<i class="fas fa-heart-broken text-6xl text-gray-400"></i>'}
+                    </div>
+                    <h2 class="text-4xl font-bold mb-2 text-gray-800 uppercase">${isWinner ? 'Chiến thắng!' : 'Thua cuộc'}</h2>
+                    <p class="text-2xl mb-8 text-gray-600">Bạn: <span class="text-blue-600 font-bold">${myScore}</span> - Đối thủ: <span class="text-red-500 font-bold">${oppScore}</span></p>
+                    <button onclick="navigateTo('dashboard')" class="px-8 py-3 bg-gray-800 text-white rounded-lg hover:bg-gray-900 font-bold shadow-lg">
+                        Về trang chủ
+                    </button>
+                </div>
+            `;
+        }
+
+        // === MODULE: LEADERBOARD ===
+        function renderLeaderboard(container) {
+            container.innerHTML = `
+                <div class="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-100">
+                    <div class="p-6 bg-gradient-to-r from-yellow-400 to-orange-500 text-white">
+                        <h2 class="text-2xl font-bold flex items-center gap-3">
+                            <i class="fas fa-trophy text-yellow-100"></i> Bảng Xếp Hạng Học Sinh
+                        </h2>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full">
+                            <thead class="bg-gray-50 border-b">
+                                <tr>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Hạng</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Học sinh</th>
+                                    <th class="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Lớp</th>
+                                    <th class="px-6 py-4 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Điểm</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ranking-body" class="divide-y divide-gray-200">
+                                <tr><td colspan="4" class="p-6 text-center text-gray-500">Đang cập nhật...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+
+            const q = query(getPublicCollection(COLLECTIONS.USERS), where('role', '==', ROLES.STUDENT), orderBy('points', 'desc'));
+            const unsub = onSnapshot(q, (snap) => {
+                const tbody = document.getElementById('ranking-body');
+                if(!tbody) return;
+                
+                if (snap.empty) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="p-6 text-center text-gray-500">Chưa có dữ liệu</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = snap.docs.map((d, i) => {
+                    const u = d.data();
+                    let rankIcon = `<span class="font-mono font-bold text-gray-500">#${i + 1}</span>`;
+                    let rowClass = "hover:bg-gray-50 transition";
+                    
+                    if (i === 0) { rankIcon = '🥇'; rowClass = "bg-yellow-50 hover:bg-yellow-100"; }
+                    if (i === 1) { rankIcon = '🥈'; }
+                    if (i === 2) { rankIcon = '🥉'; }
+
+                    return `
+                        <tr class="${rowClass}">
+                            <td class="px-6 py-4 whitespace-nowrap text-xl">${rankIcon}</td>
+                            <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900 flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 text-xs font-bold">${u.name.charAt(0)}</div>
+                                ${u.name}
+                            </td>
+                            <td class="px-6 py-4 whitespace-nowrap text-gray-500">${u.classId || 'N/A'}</td>
+                            <td class="px-6 py-4 whitespace-nowrap text-right font-bold text-indigo-600">${u.points || 0}</td>
+                        </tr>
+                    `;
+                }).join('');
+            });
+            state.unsubscribes.push(unsub);
+        }
+
+        // --- 5. INITIALIZATION ---
+        onAuthStateChanged(auth, async (user) => {
+            state.user = user;
+            if (user) {
+                // Fetch Profile
+                const profileRef = doc(getPublicCollection(COLLECTIONS.USERS), user.uid);
+                // Listen to profile changes real-time
+                onSnapshot(profileRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        state.profile = docSnap.data();
+                        // Nếu đang ở màn hình loading hoặc auth thì chuyển vào dashboard
+                        if (state.view === 'loading' || state.view === 'auth') {
+                            state.view = 'dashboard';
+                        }
+                        render();
+                    } else {
+                        // Logged in but no profile (shouldn't happen with our logic but fallback)
+                        state.view = 'auth';
+                        render();
+                    }
+                });
+            } else {
+                state.profile = null;
+                state.view = 'auth';
+                render();
+            }
+        });
+
+    </script>
+</body>
+</html>

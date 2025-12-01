@@ -1,0 +1,106 @@
+Bạn hãy giúp tôi xây dựng một app giao bài tập cho học sinh, hoàn toàn không dùng backend riêng, chỉ dùng Firebase. App có các chức năng chính: Bài tập, Thi đấu, Xếp hạng, Quản trị.  
+
+**Yêu cầu chi tiết:**
+
+1. **Công nghệ sử dụng:**
+   - Frontend: Html, tailwind css,...
+   - Firebase:
+     - Authentication (Email/Password)
+     - Firestore
+     - Realtime Database
+     - Storage
+     - Cloud Functions (tùy chọn cho logic server-side)
+
+2. **User Authentication:**
+   - Roles: "student", "teacher", "admin"
+   - Thông tin user: name, avatar, classId, points, rank
+   - Học sinh chỉ xem và submit bài tập của mình
+   - Giáo viên chỉ tạo/sửa bài tập của lớp mình
+
+3. **Mô-đun Bài tập (Assignments):**
+   - Teacher tạo bài tập: title, description, questions[], type (mcq/fill/mixed), deadline, classId
+   - Student làm bài tập, submit câu trả lời
+   - Điểm được chấm tự động và lưu vào Firestore
+   - Cấu trúc Firestore:
+     ```
+     /assignments/{assignmentId}
+         - title
+         - description
+         - classId
+         - questions[]
+         - deadline
+         - type
+         - createdBy
+     /submissions/{submissionId}
+         - assignmentId
+         - studentId
+         - answers[]
+         - score
+         - timeFinished
+         - detailCorrect[]
+     ```
+
+4. **Mô-đun Thi đấu (Competitions):**
+   - Hình thức: 1v1, nhóm, thi nhanh
+   - Ghép trận theo lớp, môn học, trình độ
+   - Điểm: đúng + tốc độ + combo
+   - Sử dụng Realtime Database để lưu câu trả lời và cập nhật điểm trực tiếp
+   - Cấu trúc Realtime Database:
+     ```
+     /queue/{subject}/{studentId}  # để ghép trận
+     /matches/{matchId}
+         - player1
+         - player2
+         - questions[]
+         - status: waiting|playing|done
+         - scores {player1Score, player2Score}
+         - startTime
+     ```
+
+5. **Mô-đun Xếp hạng (Ranking):**
+   - Bảng xếp hạng theo lớp, tuần/tháng/tổng, môn học
+   - Điểm = bài tập + thi đấu + bonus streak
+   - Lưu bảng xếp hạng vào Firestore:
+     ```
+     /rankings/{classId}
+         - weekly[]
+         - monthly[]
+         - total[]
+     ```
+
+6. **Mô-đun Quản trị (Admin Panel):**
+   - Quản lý học sinh, giáo viên, lớp
+   - Tạo, sửa, xóa bài tập và ngân hàng câu hỏi
+   - Xem thống kê: số bài tập, số học sinh, tỷ lệ hoàn thành, điểm trung bình
+   - Quản lý role và quyền hạn bằng Firebase Security Rules
+
+7. **Security Rules Firebase mẫu:**
+match /users/{userId} {
+allow read: if request.auth != null;
+allow write: if request.auth.uid == userId;
+}
+match /assignments/{assignmentId} {
+allow read: if request.auth != null;
+allow write: if isTeacher();
+}
+match /submissions/{submissionId} {
+allow read: if request.auth != null;
+allow write: if request.auth.uid == resource.data.studentId;
+}
+
+8. **Yêu cầu :**
+- Database schema Firestore + Realtime Database
+- Security Rules Firebase
+- UI flow app: dashboard, bài tập, thi đấu, bảng xếp hạng, quản trị
+- Skeleton code frontend Flutter hoặc React:
+  - Lấy/ghi dữ liệu Firestore
+  - Tương tác Realtime Database
+  - Logic submit bài, tính điểm
+- Cloud Functions (nếu cần) để auto chấm bài hoặc ghép trận
+
+9. **Flow hoạt động app:**
+a. User đăng nhập → load dashboard → chọn bài tập hoặc thi đấu
+b. Học sinh làm bài → submit → Firestore lưu kết quả
+c. Xếp hạng tự động update khi có kết quả mới
+d. Thi đấu realtime: ghép trận → Realtime Database lưu câu trả lời → update điểm → kết thúc trận
+e. Admin quản lý tài khoản, lớp, bài tập, xem thống kê

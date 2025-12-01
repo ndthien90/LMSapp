@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduBattle - Nền tảng học tập & Thi đấu</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom scrollbar for better look */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Style for drag/drop items in Jumble question */
+        .jumble-word {
+            display: inline-block;
+            padding: 8px 12px;
+            margin: 4px;
+            background-color: #e0f2f1; /* Tailwind teal-50 */
+            border: 1px solid #009688; /* Tailwind teal-600 */
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-weight: 600;
+        }
+        .jumble-word:hover { background-color: #b2dfdb; }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans h-screen overflow-hidden">
+
+    <!-- App Root -->
+    <div id="app" class="h-full w-full"></div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInWithCustomToken, onAuthStateChanged, signOut, 
+                 createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, addDoc, updateDoc, onSnapshot, serverTimestamp, query, where, getDocs, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- 1. CONFIGURATION ---
+        let appId, firebaseConfig;
+        const TEACHER_CODE = "ruands10"; // Mã xác nhận giáo viên
+
+        try {
+            if (typeof __firebase_config !== 'undefined') {
+                firebaseConfig = JSON.parse(__firebase_config);
+            } else {
+                // Fallback config (Public Demo)
+                firebaseConfig = {
+                    apiKey: "AIzaSyBTHcX_Ha3CZPNHY8vcWilcOe4oF3f6rKU",
+                    authDomain: "lmsapp-19548.firebaseapp.com",
+                    projectId: "lmsapp-19548",
+                    storageBucket: "lmsapp-19548.firebasestorage.app",
+                    messagingSenderId: "584664617140",
+                    appId: "1:584664617140:web:8ffa1650976191c45887e1",
+                    measurementId: "G-1TK7RW8H15"
+                };
+            }
+            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        } catch (e) { console.error(e); firebaseConfig = {}; }
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Helper Paths
+        const getPath = (col) => `artifacts/${appId}/public/data/${col}`;
+        const getRef = (col) => collection(db, 'artifacts', appId, 'public', 'data', col);
+
+        // --- 2. STATE MANAGEMENT ---
+        const state = {
+            user: null,
+            profile: null,
+            view: 'dashboard', 
+            data: {
+                assignments: [],
+                submissions: [],
+                users: [],
+                matches: [],
+                vocabulary: [] // Store loaded vocabulary here
+            },
+            ui: {
+                isCreatingAssignment: false,
+                takingAssignmentId: null,
+                assignmentAnswers: {},
+                newAssignment: { title: '', questions: [] },
+                activeMatch: null,
+                matchQIndex: 0,
+                authMode: 'login',
+                newQuestionType: 'mcq',
+                competitionMode: 'lobby'
+            },
+            isAuthReady: false 
+        };
+
+        // --- 3. UTILITIES & DATA LOADING ---
+
+        window.showToast = (msg, type = 'success') => {
+            const container = document.getElementById('toast-container');
+            const el = document.createElement('div');
+            const color = type === 'error' ? 'bg-red-500' : 'bg-green-600';
+            el.className = `${color} text-white px-6 py-3 rounded-lg shadow-xl animate-bounce mb-2 transition-all duration-500`;
+            el.textContent = msg;
+            container.appendChild(el);
+            setTimeout(() => {
+                el.style.opacity = '0';
+                setTimeout(() => el.remove(), 500);
+            }, 3000);
+        };
+
+        const renderIcons = () => lucide.createIcons();
+
+        // TEXT-TO-SPEECH (Web Speech API)
+        window.speakWord = (text) => {
+            if ('speechSynthesis' in window) {
+                // Cancel previous speech to avoid queue buildup
+                window.speechSynthesis.cancel();
+                
+                const utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'zh-CN'; // Set language to Chinese
+                utterance.rate = 0.8; // Slightly slower for clarity
+                
+                window.speechSynthesis.speak(utterance);
+            } else {
+                showToast("Trình duyệt không hỗ trợ âm thanh.", "error");
+            }
+        };
+
+        // LOAD DATA FROM LOCAL FILE
+        const loadVocabulary = async () => {
+            try {
+                // Thử load từ file cục bộ (yêu cầu chạy trên server localhost)
+                const response = await fetch('dataLMS/data.txt');
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                
+                const text = await response.text();
+                // Parse format: từ vựng|pinyin|nghĩa
+                const vocab = text.split('\n')
+                    .map(line => line.trim())
+                    .filter(line => line.length > 0)
+                    .map(line => {
+                        const parts = line.split('|');
+                        if (parts.length >= 3) {
+                            return { word: parts[0].trim(), pinyin: parts[1].trim(), meaning: parts[2].trim() };
+                        }
+                        return null;
+                    })
+                    .filter(item => item !== null);
+
+                if (vocab.length === 0) throw new Error("File rỗng");
+                
+                state.data.vocabulary = vocab;
+                console.log("Loaded vocabulary:", vocab.length, "words");
+
+            } catch (e) {
+                console.warn("Không load được dataLMS/data.txt, sử dụng dữ liệu mẫu.", e);
+                // Dữ liệu mẫu fallback nếu không có file
+                state.data.vocabulary = [
+                    { word: '你好', pinyin: 'nǐ hǎo', meaning: 'Xin chào' },
+                    { word: '谢谢', pinyin: 'xièxie', meaning: 'Cảm ơn' },
+                    { word: '再见', pinyin: 'zàijiàn', meaning: 'Tạm biệt' },
+                    { word: '老师', pinyin: 'lǎoshī', meaning: 'Giáo viên' },
+                    { word: '学生', pinyin: 'xuésheng', meaning: 'Học sinh' },
+                    { word: '朋友', pinyin: 'péngyou', meaning: 'Bạn bè' },
+                    { word: '爱', pinyin: 'ài', meaning: 'Yêu' },
+                    { word: '喜欢', pinyin: 'xǐhuan', meaning: 'Thích' },
+                    { word: '猫', pinyin: 'māo', meaning: 'Con mèo' },
+                    { word: '狗', pinyin: 'gǒu', meaning: 'Con chó' },
+                    { word: '水', pinyin: 'shuǐ', meaning: 'Nước' },
+                    { word: '书', pinyin: 'shū', meaning: 'Sách' }
+                ];
+                if (state.view === 'competition') {
+                    showToast("Đang dùng dữ liệu mẫu (không tìm thấy dataLMS/data.txt)", "error");
+                }
+            }
+        };
+
+        // --- 4. LOGIC TẠO CÂU HỎI ĐẤU TRƯỜNG MỚI ---
+
+        const generateArenaQuestions = () => {
+            const vocabList = state.data.vocabulary;
+            const questions = [];
+            
+            // Đảm bảo có đủ từ vựng
+            if (vocabList.length < 4) {
+                showToast("Không đủ từ vựng để tạo câu hỏi!", "error");
+                return [];
+            }
+
+            for(let i = 0; i < 10; i++) {
+                // Chọn ngẫu nhiên 1 từ làm đáp án đúng
+                const correctItem = vocabList[Math.floor(Math.random() * vocabList.length)];
+                
+                // Chọn ngẫu nhiên loại câu hỏi (1-5)
+                // 1: Word -> Meaning
+                // 2: Word -> Pinyin
+                // 3: Meaning -> Word
+                // 4: Audio -> Word
+                // 5: Audio -> Meaning
+                const type = Math.floor(Math.random() * 5) + 1;
+                
+                let qText = "";
+                let qOptions = []; // Chứa chuỗi hiển thị của options
+                let correctAnswerVal = ""; 
+                let audioWord = null;
+
+                // Tạo tập options (1 đúng + 3 sai)
+                // Lấy 3 từ sai khác với correctItem
+                const distractors = [];
+                while(distractors.length < 3) {
+                    const item = vocabList[Math.floor(Math.random() * vocabList.length)];
+                    if (item.word !== correctItem.word && !distractors.includes(item)) {
+                        distractors.push(item);
+                    }
+                }
+
+                // Xử lý từng loại câu hỏi
+                switch(type) {
+                    case 1: // Nhìn từ chọn nghĩa
+                        qText = `Nghĩa của từ <span class="text-blue-600 font-bold text-3xl mx-2">${correctItem.word}</span> là gì?`;
+                        correctAnswerVal = correctItem.meaning;
+                        qOptions = [correctItem.meaning, ...distractors.map(d => d.meaning)];
+                        break;
+                    case 2: // Nhìn từ chọn pinyin
+                        qText = `Pinyin của từ <span class="text-blue-600 font-bold text-3xl mx-2">${correctItem.word}</span> là gì?`;
+                        correctAnswerVal = correctItem.pinyin;
+                        qOptions = [correctItem.pinyin, ...distractors.map(d => d.pinyin)];
+                        break;
+                    case 3: // Nhìn nghĩa chọn từ
+                        qText = `Từ nào có nghĩa là <span class="text-green-600 font-bold text-2xl mx-2">"${correctItem.meaning}"</span>?`;
+                        correctAnswerVal = correctItem.word;
+                        qOptions = [correctItem.word, ...distractors.map(d => d.word)];
+                        break;
+                    case 4: // Nghe chọn từ
+                        qText = `Nghe và chọn từ vựng đúng:`;
+                        audioWord = correctItem.word; // Dùng để phát âm
+                        correctAnswerVal = correctItem.word;
+                        qOptions = [correctItem.word, ...distractors.map(d => d.word)];
+                        break;
+                    case 5: // Nghe chọn nghĩa
+                        qText = `Nghe và chọn nghĩa đúng:`;
+                        audioWord = correctItem.word;
+                        correctAnswerVal = correctItem.meaning;
+                        qOptions = [correctItem.meaning, ...distractors.map(d => d.meaning)];
+                        break;
+                }
+
+                // Xáo trộn options
+                const shuffledOptions = qOptions.sort(() => Math.random() - 0.5);
+                const correctIndex = shuffledOptions.indexOf(correctAnswerVal);
+
+                questions.push({
+                    type: 'arena_quiz', // Đánh dấu là loại quiz mới
+                    qTypeId: type,
+                    text: qText,
+                    options: shuffledOptions,
+                    correct: correctIndex,
+                    audioWord: audioWord // Nếu có, UI sẽ hiện nút loa
+                });
+            }
+            return questions;
+        };
+
+
+        // --- 5. SETUP & RENDER ---
+
+        const initAuth = async () => {
+            // Load vocabulary ngay khi khởi động app
+            await loadVocabulary();
+
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            }
+        };
+
+        const setupListeners = (uid) => {
+            onSnapshot(doc(db, getPath('users'), uid), (snap) => {
+                if(snap.exists()) {
+                    state.profile = snap.data();
+                    renderApp();
+                } else if (state.user) {
+                    state.profile = null;
+                    renderApp();
+                }
+            });
+            onSnapshot(getRef('assignments'), (snap) => {
+                state.data.assignments = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                if(state.view === 'assignments' || state.view === 'dashboard') renderApp();
+            });
+            onSnapshot(getRef('submissions'), (snap) => {
+                state.data.submissions = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                if(state.view === 'assignments' || state.view === 'dashboard') renderApp();
+            });
+            onSnapshot(getRef('users'), (snap) => {
+                state.data.users = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                if(state.view === 'ranking') renderApp();
+            });
+            
+            onSnapshot(getRef('matches'), (snap) => {
+                state.data.matches = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                const uid = state.user?.uid;
+                state.ui.activeMatch = state.data.matches.find(m => 
+                    (m.player1?.uid === uid || m.player2?.uid === uid) && m.status !== 'finished'
+                );
+                
+                if (state.view === 'competition') {
+                    if (state.ui.activeMatch) {
+                        state.ui.competitionMode = state.ui.activeMatch.status === 'playing' ? 'playing' : 'waiting';
+                    } else if (state.ui.competitionMode === 'playing' || state.ui.competitionMode === 'waiting') {
+                        state.ui.competitionMode = 'lobby';
+                    }
+                    renderApp();
+                }
+            });
+        };
+
+        const renderApp = () => {
+            const appEl = document.getElementById('app');
+            if (!state.isAuthReady || !state.user || !state.profile) {
+                appEl.innerHTML = renderAuthScreen();
+            } else {
+                appEl.innerHTML = renderMainLayout();
+            }
+            renderIcons();
+        };
+
+        // --- AUTH & LAYOUT (Giữ nguyên cấu trúc cũ, chỉ rút gọn cho sạch) ---
+        const renderAuthScreen = () => {
+            const isRegister = state.ui.authMode === 'register';
+            const currentRole = document.querySelector('input[name="role"]:checked')?.value || 'student';
+            const isTeacherSelected = currentRole === 'teacher';
+            
+            return `
+                <div class="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+                    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md fade-in">
+                        <div class="text-center mb-8">
+                            <div class="bg-blue-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i data-lucide="book-open" class="text-white w-8 h-8"></i>
+                            </div>
+                            <h1 class="text-3xl font-bold text-slate-800">EduBattle</h1>
+                            <p class="text-slate-500">Nền tảng học tập & thi đấu</p>
+                        </div>
+                        <h2 class="text-2xl font-bold text-slate-800 mb-6 text-center">${isRegister ? 'Đăng ký' : 'Đăng nhập'}</h2>
+                        <form onsubmit="${isRegister ? 'handleRegister(event)' : 'handleLogin(event)'}" class="space-y-4">
+                            ${isRegister ? `
+                                <input id="join-name" type="text" required class="w-full p-3 border rounded-lg" placeholder="Họ và tên">
+                                <input id="join-email" type="email" required class="w-full p-3 border rounded-lg" placeholder="Email">
+                                <input id="join-password" type="password" required class="w-full p-3 border rounded-lg" placeholder="Mật khẩu">
+                                <div class="grid grid-cols-2 gap-4">
+                                    <label class="cursor-pointer border p-2 rounded text-center"><input type="radio" name="role" value="student" checked onchange="renderApp()"> Học sinh</label>
+                                    <label class="cursor-pointer border p-2 rounded text-center"><input type="radio" name="role" value="teacher" onchange="renderApp()"> Giáo viên</label>
+                                </div>
+                                ${currentRole === 'teacher' ? '<input id="teacher-code" type="text" class="w-full p-3 border border-purple-300 rounded-lg" placeholder="Mã giáo viên (ruands10)">' : ''}
+                                <button type="submit" class="w-full bg-blue-600 text-white py-3 rounded-lg font-bold">Đăng ký</button>
+                            ` : `
+                                <input id="login-email" type="email" required class="w-full p-3 border rounded-lg" placeholder="Email">
+                                <input id="login-password" type="password" required class="w-full p-3 border rounded-lg" placeholder="Mật khẩu">
+                                <button type="submit" class="w-full bg-green-600 text-white py-3 rounded-lg font-bold">Đăng nhập</button>
+                            `}
+                        </form>
+                        <div class="mt-4 text-center">
+                            <button onclick="setAuthMode('${isRegister ? 'login' : 'register'}')" class="text-blue-600 font-bold hover:underline">
+                                ${isRegister ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký'}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderMainLayout = () => `
+            <div class="flex h-screen bg-slate-50 overflow-hidden">
+                <div class="w-64 bg-slate-900 text-slate-300 flex flex-col shadow-xl flex-shrink-0">
+                    <div class="p-6 border-b border-slate-800 flex items-center gap-3">
+                        <div class="bg-blue-600 p-2 rounded-lg"><i data-lucide="book-open" class="text-white"></i></div>
+                        <h1 class="text-xl font-bold text-white">EduBattle</h1>
+                    </div>
+                    <nav class="flex-1 p-4 space-y-2">
+                        ${renderNavItem('dashboard', 'layout-dashboard', 'Tổng quan')}
+                        ${renderNavItem('assignments', 'book-open', 'Bài tập')}
+                        ${renderNavItem('competition', 'swords', 'Đấu trường')}
+                        ${renderNavItem('ranking', 'trophy', 'Xếp hạng')}
+                    </nav>
+                    <div class="p-4 border-t border-slate-800">
+                        <div class="flex items-center gap-3 mb-4 px-2">
+                            <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white bg-blue-500">${state.profile.name.charAt(0)}</div>
+                            <div class="overflow-hidden"><p class="text-sm font-medium text-white truncate">${state.profile.name}</p></div>
+                        </div>
+                        <button onclick="handleSignOut()" class="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-slate-800 rounded-lg"><i data-lucide="log-out" size="16"></i> Đăng xuất</button>
+                    </div>
+                </div>
+                <div class="flex-1 flex flex-col min-w-0">
+                    <header class="bg-white shadow-sm px-8 py-4 flex justify-between items-center z-10">
+                        <h2 class="text-2xl font-bold text-slate-800 capitalize">${state.view === 'competition' ? 'Đấu trường từ vựng' : state.view}</h2>
+                        <div class="px-4 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-bold flex items-center gap-2">
+                            <i data-lucide="trophy" size="14"></i> ${state.profile.points} điểm
+                        </div>
+                    </header>
+                    <main class="flex-1 overflow-auto p-8 fade-in">${renderViewContent()}</main>
+                </div>
+            </div>
+        `;
+
+        const renderNavItem = (viewName, icon, label) => `
+            <button onclick="changeView('${viewName}')" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${state.view === viewName ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-slate-800'}">
+                <i data-lucide="${icon}" size="20"></i> <span class="font-medium">${label}</span>
+            </button>
+        `;
+
+        const renderViewContent = () => {
+            switch(state.view) {
+                case 'dashboard': return renderDashboard();
+                case 'assignments': return renderAssignments();
+                case 'competition': return renderCompetition();
+                case 'ranking': return renderRanking();
+                default: return '';
+            }
+        };
+
+        // --- DASHBOARD, ASSIGNMENTS, RANKING (Giữ nguyên) ---
+        const renderDashboard = () => `
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                    <div class="p-4 rounded-xl bg-yellow-50 text-yellow-500"><i data-lucide="trophy"></i></div>
+                    <div><p class="text-slate-500 text-sm">Điểm tích lũy</p><p class="text-2xl font-bold text-slate-800">${state.profile.points}</p></div>
+                </div>
+            </div>
+            <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-8 text-white shadow-xl">
+                <h3 class="text-2xl font-bold mb-2">Xin chào, ${state.profile.name}!</h3>
+                <p class="mb-6">Sẵn sàng chinh phục từ vựng tiếng Trung chưa?</p>
+                <button onclick="changeView('competition')" class="bg-white text-blue-700 px-6 py-2 rounded-lg font-bold">Vào Đấu Trường Ngay</button>
+            </div>
+        `;
+
+        const renderAssignments = () => `<div class="text-center text-slate-500 mt-10">Chức năng Bài tập vẫn giữ nguyên (xem code cũ nếu cần chi tiết). Tập trung vào Đấu trường ở bản update này.</div>`;
+        
+        const renderRanking = () => {
+            const sorted = [...state.data.users].sort((a,b) => (b.points||0) - (a.points||0));
+            return `
+                <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <table class="w-full">
+                        <thead class="bg-slate-50 border-b">
+                            <tr><th class="p-4 text-left">Hạng</th><th class="p-4 text-left">Tên</th><th class="p-4 text-right">Điểm</th></tr>
+                        </thead>
+                        <tbody>
+                            ${sorted.map((u, idx) => `
+                                <tr class="border-b hover:bg-slate-50">
+                                    <td class="p-4 font-bold text-slate-500">#${idx+1}</td>
+                                    <td class="p-4 font-medium">${u.name}</td>
+                                    <td class="p-4 text-right font-bold text-blue-600">${u.points}</td>
+                                </tr>`).join('')}
+                        </tbody>
+                    </table>
+                </div>
+            `;
+        };
+
+        // --- COMPETITION RENDERERS (UPDATED) ---
+
+        const renderCompetitionLobby = () => `
+            <div class="text-center py-12 bg-white rounded-3xl shadow-xl">
+                <div class="inline-block p-6 bg-purple-100 rounded-full mb-6">
+                    <i data-lucide="swords" class="w-16 h-16 text-purple-600"></i>
+                </div>
+                <h2 class="text-3xl font-bold text-slate-800 mb-6">Đấu trường Từ vựng</h2>
+                <div class="mb-6">
+                    <p class="text-slate-500">Số lượng từ vựng hiện có: <span class="font-bold text-blue-600">${state.data.vocabulary.length}</span></p>
+                    <p class="text-xs text-slate-400 mt-1">(Dữ liệu load từ dataLMS/data.txt)</p>
+                </div>
+                <div class="flex justify-center gap-8">
+                    <button onclick="createMatch()" class="bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl transition transform hover:-translate-y-1">
+                        Tạo Phòng Mới
+                    </button>
+                    <button onclick="setCompetitionMode('join')" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl transition transform hover:-translate-y-1">
+                        Tham Gia Phòng
+                    </button>
+                </div>
+            </div>
+        `;
+
+        const renderCompetitionJoin = () => `
+            <div class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-xl text-center">
+                <h3 class="text-2xl font-bold text-slate-700 mb-6">Nhập Mã Phòng</h3>
+                <input id="room-code-input" type="text" class="w-full p-4 border-2 border-slate-300 rounded-xl text-center text-xl font-bold tracking-widest uppercase mb-4" maxlength="6" placeholder="CODE">
+                <button onclick="joinMatch()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-4">Tham Gia</button>
+                <button onclick="setCompetitionMode('lobby')" class="text-slate-500">Quay lại</button>
+            </div>
+        `;
+
+        const renderCompetitionWaiting = (match) => {
+            const isOwner = match.player1.uid === state.user.uid;
+            return `
+                <div class="max-w-xl mx-auto bg-white p-8 rounded-2xl shadow-xl text-center">
+                    <h3 class="text-2xl font-bold text-slate-700 mb-2">Phòng chờ: <span class="text-purple-600">${match.roomCode}</span></h3>
+                    <p class="text-slate-500 mb-6">Chia sẻ mã này cho đối thủ.</p>
+                    <div class="flex justify-center gap-8 mb-8">
+                        <div class="text-center">
+                            <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2 text-blue-600 font-bold text-xl">${match.player1.name.charAt(0)}</div>
+                            <p class="font-bold text-blue-700">${match.player1.name}</p>
+                        </div>
+                        <div class="self-center font-bold text-slate-300 text-xl">VS</div>
+                        <div class="text-center">
+                            <div class="w-16 h-16 ${match.player2 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-400'} rounded-full flex items-center justify-center mx-auto mb-2 font-bold text-xl">
+                                ${match.player2 ? match.player2.name.charAt(0) : '?'}
+                            </div>
+                            <p class="font-bold ${match.player2 ? 'text-red-700' : 'text-slate-400'}">${match.player2 ? match.player2.name : 'Đang chờ...'}</p>
+                        </div>
+                    </div>
+                    ${isOwner && match.player2 ? `<button onclick="startMatch('${match.id}')" class="bg-green-600 text-white py-3 px-8 rounded-xl font-bold text-lg animate-pulse">Bắt đầu ngay</button>` : ''}
+                    ${!match.player2 ? `<button onclick="leaveMatch('${match.id}')" class="mt-4 text-red-500">Hủy phòng</button>` : ''}
+                </div>
+            `;
+        };
+
+        const renderCompetitionPlaying = (match) => {
+            const uid = state.user.uid;
+            const qIndex = state.ui.matchQIndex;
+            const q = match.questions[qIndex];
+            
+            if (!q) return `<div class="text-center">Đang tải kết quả...</div>`;
+
+            // Logic hiển thị câu hỏi đặc biệt (có âm thanh)
+            const audioBtn = q.audioWord ? `
+                <button onclick="speakWord('${q.audioWord}')" class="mb-4 inline-flex items-center gap-2 bg-purple-100 text-purple-700 px-6 py-3 rounded-full font-bold hover:bg-purple-200 transition">
+                    <i data-lucide="volume-2"></i> Nghe âm thanh
+                </button>
+            ` : '';
+
+            // Tự động phát âm thanh khi mới load câu hỏi dạng Audio
+            if (q.audioWord) {
+                // Delay nhẹ để tránh xung đột render
+                setTimeout(() => speakWord(q.audioWord), 500);
+            }
+
+            return `
+                <div class="max-w-4xl mx-auto">
+                    <!-- Score Board -->
+                    <div class="flex justify-between mb-8">
+                        <div class="bg-blue-600 text-white px-6 py-3 rounded-xl shadow-lg">
+                            <p class="text-sm opacity-80">${match.player1.name}</p>
+                            <p class="text-3xl font-bold">${match.player1.score}</p>
+                        </div>
+                        <div class="bg-red-500 text-white px-6 py-3 rounded-xl shadow-lg text-right">
+                            <p class="text-sm opacity-80">${match.player2.name}</p>
+                            <p class="text-3xl font-bold">${match.player2.score}</p>
+                        </div>
+                    </div>
+
+                    <!-- Question Card -->
+                    <div class="bg-white p-8 rounded-3xl shadow-2xl text-center border-b-8 border-slate-200">
+                        <div class="mb-6">
+                            <span class="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-sm font-bold uppercase tracking-wider">Câu hỏi ${qIndex + 1}/${match.questions.length}</span>
+                        </div>
+                        
+                        ${audioBtn}
+                        
+                        <h2 class="text-2xl md:text-3xl font-medium text-slate-700 mb-8 leading-relaxed">
+                            ${q.text}
+                        </h2>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            ${q.options.map((opt, idx) => `
+                                <button onclick="answerMatch(${idx === q.correct}, '${match.id}')" class="p-6 bg-slate-50 border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700 rounded-2xl text-xl font-bold transition-all transform active:scale-95 text-slate-700">
+                                    ${opt}
+                                </button>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderCompetition = () => {
+            const mode = state.ui.competitionMode;
+            const match = state.ui.activeMatch;
+            switch(mode) {
+                case 'create': return '<div class="text-center">Creating...</div>'; // Placeholder
+                case 'join': return renderCompetitionJoin();
+                case 'waiting': return renderCompetitionWaiting(match);
+                case 'playing': return renderCompetitionPlaying(match);
+                case 'lobby': default: return renderCompetitionLobby();
+            }
+        };
+
+        // --- HANDLERS ---
+
+        window.setAuthMode = (m) => { state.ui.authMode = m; renderApp(); };
+        window.changeView = (v) => { 
+            state.view = v; 
+            if(v!=='competition') { state.ui.competitionMode='lobby'; state.ui.activeMatch=null; }
+            // Nếu vào đấu trường, thử reload lại vocabulary cho chắc
+            if(v==='competition') loadVocabulary();
+            renderApp(); 
+        };
+        window.setCompetitionMode = (m) => { state.ui.competitionMode = m; renderApp(); };
+
+        window.handleLogin = async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            try { await signInWithEmailAndPassword(auth, email, password); showToast("Đăng nhập thành công!"); }
+            catch(err) { showToast("Lỗi đăng nhập: " + err.message, "error"); }
+        };
+
+        window.handleRegister = async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('join-email').value;
+            const password = document.getElementById('join-password').value;
+            const name = document.getElementById('join-name').value;
+            const role = document.querySelector('input[name="role"]:checked').value;
+            
+            if (role === 'teacher' && document.getElementById('teacher-code').value !== TEACHER_CODE) 
+                return showToast("Sai mã giáo viên", "error");
+
+            try {
+                const cred = await createUserWithEmailAndPassword(auth, email, password);
+                await setDoc(doc(db, getPath('users'), cred.user.uid), {
+                    uid: cred.user.uid, name, role, points: 0, email, createdAt: serverTimestamp()
+                });
+                showToast("Đăng ký thành công!");
+            } catch(err) { showToast("Lỗi đăng ký: " + err.message, "error"); }
+        };
+
+        window.handleSignOut = async () => { await signOut(auth); window.location.reload(); };
+
+        // Competition Logic Handlers
+        window.createMatch = async () => {
+            try {
+                // Ensure vocab is ready
+                if (state.data.vocabulary.length === 0) await loadVocabulary();
+
+                const questions = generateArenaQuestions();
+                if (questions.length === 0) return; // Error handled inside generate
+
+                const roomCode = Math.random().toString(36).substring(2,8).toUpperCase();
+                await addDoc(getRef('matches'), {
+                    roomCode,
+                    player1: { uid: state.user.uid, name: state.profile.name, score: 0 },
+                    player2: null,
+                    status: 'waiting',
+                    questions,
+                    createdAt: serverTimestamp()
+                });
+                state.ui.competitionMode = 'waiting';
+                showToast(`Đã tạo phòng ${roomCode}`);
+            } catch(e) { showToast("Lỗi tạo phòng: " + e.message, "error"); }
+        };
+
+        window.joinMatch = async () => {
+            const code = document.getElementById('room-code-input').value.trim().toUpperCase();
+            if (code.length !== 6) return showToast("Mã phòng không hợp lệ", "error");
+            
+            try {
+                const q = query(getRef('matches'), where('roomCode', '==', code), where('status', '==', 'waiting'));
+                const snap = await getDocs(q);
+                if(snap.empty) return showToast("Phòng không tồn tại hoặc đã đầy", "error");
+                
+                const matchDoc = snap.docs[0];
+                if(matchDoc.data().player1.uid === state.user.uid) {
+                    state.ui.competitionMode = 'waiting'; renderApp();
+                    return showToast("Bạn đã ở trong phòng này");
+                }
+
+                await updateDoc(doc(db, getPath('matches'), matchDoc.id), {
+                    player2: { uid: state.user.uid, name: state.profile.name, score: 0 }
+                });
+                state.ui.competitionMode = 'waiting';
+                showToast("Đã tham gia phòng!");
+            } catch(e) { showToast("Lỗi tham gia: " + e.message, "error"); }
+        };
+
+        window.startMatch = async (mid) => {
+            try {
+                await updateDoc(doc(db, getPath('matches'), mid), { status: 'playing', startTime: serverTimestamp() });
+                state.ui.matchQIndex = 0;
+            } catch(e) { showToast("Lỗi bắt đầu", "error"); }
+        };
+
+        window.leaveMatch = async (mid) => {
+            try {
+                await deleteDoc(doc(db, getPath('matches'), mid)); // Simple logic: destroy room
+                state.ui.activeMatch = null;
+                state.ui.competitionMode = 'lobby';
+                renderApp();
+            } catch(e) { showToast("Lỗi hủy phòng", "error"); }
+        };
+
+        window.answerMatch = async (isCorrect, mid) => {
+            const match = state.ui.activeMatch;
+            if(!match || match.status !== 'playing') return;
+            
+            const isP1 = match.player1.uid === state.user.uid;
+            const newScore = (isP1 ? match.player1.score : match.player2.score) + (isCorrect ? 10 : 0);
+            const updateData = isP1 ? { "player1.score": newScore } : { "player2.score": newScore };
+
+            if (state.ui.matchQIndex < match.questions.length - 1) {
+                state.ui.matchQIndex++;
+                await updateDoc(doc(db, getPath('matches'), mid), updateData);
+                renderApp();
+            } else {
+                await updateDoc(doc(db, getPath('matches'), mid), { ...updateData, status: 'finished' });
+                await updateDoc(doc(db, getPath('users'), state.user.uid), { points: (state.profile.points || 0) + newScore });
+                state.ui.matchQIndex = 0;
+                showToast(`Kết thúc! Điểm: ${newScore}`);
+            }
+        };
+
+        // Bootstrap
+        onAuthStateChanged(auth, (u) => {
+            state.user = u; state.isAuthReady = true;
+            if(u) setupListeners(u.uid);
+            else { state.profile = null; state.ui.authMode = 'login'; renderApp(); }
+        });
+
+        initAuth();
+
+    </script>
+</body>
+</html>

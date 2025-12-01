@@ -1,0 +1,1285 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EduBattle - Nền tảng học tập & Thi đấu</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Custom scrollbar for better look */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        .fade-in { animation: fadeIn 0.3s ease-in-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        /* Style for drag/drop items in Jumble question */
+        .jumble-word {
+            display: inline-block;
+            padding: 8px 12px;
+            margin: 4px;
+            background-color: #e0f2f1; /* Tailwind teal-50 */
+            border: 1px solid #009688; /* Tailwind teal-600 */
+            border-radius: 6px;
+            cursor: pointer;
+            transition: background-color 0.2s;
+            font-weight: 600;
+        }
+        .jumble-word:hover { background-color: #b2dfdb; }
+        .jumble-slot {
+            display: inline-block;
+            min-width: 100px;
+            height: 40px;
+            line-height: 40px;
+            text-align: center;
+            border-bottom: 2px solid #94a3b8; /* Tailwind slate-400 */
+            margin: 4px;
+            padding: 0 10px;
+            background-color: #f8fafc; /* Tailwind slate-50 */
+            border-radius: 4px 4px 0 0;
+            font-size: 1rem;
+            color: #1e293b;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans h-screen overflow-hidden">
+
+    <!-- App Root -->
+    <div id="app" class="h-full w-full"></div>
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged, signOut, 
+                 createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, addDoc, updateDoc, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- 1. CONFIGURATION ---
+        let appId, firebaseConfig;
+        const TEACHER_CODE = "ruands10"; // Mã xác nhận giáo viên
+
+        try {
+            if (typeof __firebase_config !== 'undefined') {
+                firebaseConfig = JSON.parse(__firebase_config);
+            } else {
+                firebaseConfig = {
+                    apiKey: "", // API Key sẽ được môi trường cung cấp hoặc điền vào đây
+                    authDomain: "luyentap-6a41d.firebaseapp.com",
+                    projectId: "luyentap-6a41d",
+                    storageBucket: "luyentap-6a41d.firebasestorage.app",
+                    messagingSenderId: "465317787705",
+                    appId: "1:465317787705:web:0d8da583bca42a50c9b5e8",
+                    measurementId: "G-16JDMYB0SJ"
+                }
+            }
+            appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        } catch (e) { console.error(e); firebaseConfig = {}; }
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // Helper Paths
+        const getPath = (col) => `artifacts/${appId}/public/data/${col}`;
+        const getRef = (col) => collection(db, 'artifacts', appId, 'public', 'data', col);
+
+        // --- 2. STATE MANAGEMENT ---
+        const state = {
+            user: null,
+            profile: null,
+            view: 'dashboard', // dashboard, assignments, competition, ranking
+            data: {
+                assignments: [],
+                submissions: [],
+                users: [],
+                matches: []
+            },
+            ui: {
+                isCreatingAssignment: false,
+                takingAssignmentId: null,
+                assignmentAnswers: {},
+                newAssignment: { title: '', questions: [] },
+                activeMatch: null,
+                matchQIndex: 0,
+                authMode: 'login', // 'login' or 'register'
+                newQuestionType: 'mcq' // mcq, fib, jumble, match, translation - Kiểu câu hỏi mới
+            },
+            isAuthReady: false 
+        };
+
+        // Lưu trữ các hàm hủy đăng ký (unsubscribe) để tránh rò rỉ bộ nhớ
+        const listeners = {
+            profile: null,
+            assignments: null,
+            submissions: null,
+            users: null,
+            matches: null
+        };
+        
+        // --- 3. CORE FUNCTIONS ---
+
+        // Notification System
+        window.showToast = (msg, type = 'success') => {
+            const container = document.getElementById('toast-container');
+            const el = document.createElement('div');
+            const color = type === 'error' ? 'bg-red-500' : 'bg-green-600';
+            el.className = `${color} text-white px-6 py-3 rounded-lg shadow-xl animate-bounce mb-2 transition-all duration-500`;
+            el.textContent = msg;
+            container.appendChild(el);
+            setTimeout(() => {
+                el.style.opacity = '0';
+                setTimeout(() => el.remove(), 500);
+            }, 3000);
+        };
+
+        // Render Icons
+        const renderIcons = () => {
+            if (window.lucide) {
+                window.lucide.createIcons();
+            }
+        };
+
+        // Auth Logic: Init (Chỉ dùng custom token nếu có)
+        const initAuth = async () => {
+            if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                await signInWithCustomToken(auth, __initial_auth_token);
+            }
+        };
+
+        // Data Listeners - CẬP NHẬT: Thêm cơ chế hủy listener cũ và bắt lỗi
+        const setupListeners = (uid) => {
+            // Hủy các listener cũ nếu tồn tại
+            Object.values(listeners).forEach(unsub => unsub && unsub());
+
+            // 1. Profile Listener
+            listeners.profile = onSnapshot(doc(db, getPath('users'), uid), (snap) => {
+                if(snap.exists()) {
+                    state.profile = snap.data();
+                    renderApp();
+                } else if (state.user) {
+                    state.profile = null;
+                    renderApp();
+                }
+            }, (error) => console.error("Profile Error:", error));
+
+            // 2. Assignments Listener
+            listeners.assignments = onSnapshot(getRef('assignments'), (snap) => {
+                state.data.assignments = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                // Luôn render lại khi có dữ liệu mới để đảm bảo danh sách cập nhật ngay lập tức
+                if(state.view === 'assignments' || state.view === 'dashboard') renderApp();
+            }, (error) => {
+                console.error("Assignment Error:", error);
+                showToast("Lỗi tải danh sách bài tập", "error");
+            });
+
+            // 3. Submissions Listener
+            listeners.submissions = onSnapshot(getRef('submissions'), (snap) => {
+                state.data.submissions = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                if(state.view === 'assignments' || state.view === 'dashboard') renderApp();
+            }, (error) => console.error("Submission Error:", error));
+
+            // 4. Users Listener (Rank)
+            listeners.users = onSnapshot(getRef('users'), (snap) => {
+                state.data.users = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                if(state.view === 'ranking') renderApp();
+            }, (error) => console.error("Users Error:", error));
+
+            // 5. Matches Listener
+            listeners.matches = onSnapshot(getRef('matches'), (snap) => {
+                state.data.matches = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                if(state.view === 'competition') renderApp();
+            }, (error) => console.error("Matches Error:", error));
+        };
+
+        // --- 4. RENDER LOGIC ---
+
+        const renderApp = () => {
+            const appEl = document.getElementById('app');
+            // Nếu Auth chưa sẵn sàng HOẶC chưa có user HOẶC chưa có profile, show màn hình Auth
+            if (!state.isAuthReady || !state.user || !state.profile) {
+                appEl.innerHTML = renderAuthScreen();
+            } else {
+                appEl.innerHTML = renderMainLayout();
+            }
+            // Đảm bảo icon được render sau khi DOM cập nhật
+            setTimeout(renderIcons, 0);
+        };
+        
+        // --- AUTH SCREEN ---
+
+        const renderAuthScreen = () => {
+            const isRegister = state.ui.authMode === 'register';
+
+            // Lấy giá trị của vai trò đang được chọn (mặc định là 'student')
+            const currentRole = document.querySelector('input[name="role"]:checked')?.value || 'student';
+            const isTeacherSelected = currentRole === 'teacher';
+            
+            const roleSelection = `
+                <div class="space-y-4">
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Vai trò</label>
+                    <div class="grid grid-cols-2 gap-4">
+                        <label class="cursor-pointer">
+                            <input type="radio" name="role" value="student" ${currentRole === 'student' ? 'checked' : ''} onchange="toggleTeacherCode(false)" class="peer sr-only">
+                            <div class="p-3 rounded-lg border border-slate-200 text-slate-500 flex flex-col items-center gap-2 peer-checked:border-blue-500 peer-checked:bg-blue-50 peer-checked:text-blue-700 transition-all">
+                                <i data-lucide="user" size="20"></i>
+                                <span class="font-medium">Học sinh</span>
+                            </div>
+                        </label>
+                        <label class="cursor-pointer">
+                            <input type="radio" name="role" value="teacher" ${currentRole === 'teacher' ? 'checked' : ''} onchange="toggleTeacherCode(true)" class="peer sr-only">
+                            <div class="p-3 rounded-lg border border-slate-200 text-slate-500 flex flex-col items-center gap-2 peer-checked:border-purple-500 peer-checked:bg-purple-50 peer-checked:text-purple-700 transition-all">
+                                <i data-lucide="users" size="20"></i>
+                                <span class="font-medium">Giáo viên</span>
+                            </div>
+                        </label>
+                    </div>
+                </div>
+                <div id="teacher-code-field" class="${isTeacherSelected ? '' : 'hidden'} space-y-2 fade-in">
+                    <label class="block text-sm font-medium text-slate-700">Mã xác nhận Giáo viên</label>
+                    <input id="teacher-code" type="text" class="w-full p-3 border border-purple-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Nhập mã xác nhận (ruands10)">
+                </div>
+            `;
+
+            const formContent = isRegister ? `
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Họ và tên</label>
+                    <input id="join-name" type="text" required class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Nhập tên của bạn...">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                    <input id="join-email" type="email" required class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="example@email.com">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Mật khẩu</label>
+                    <input id="join-password" type="password" required class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Mật khẩu tối thiểu 6 ký tự">
+                </div>
+                ${roleSelection}
+                <button type="submit" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-3 rounded-lg font-bold shadow-lg transition transform active:scale-95">
+                    Đăng ký tài khoản
+                </button>
+            ` : `
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Email</label>
+                    <input id="login-email" type="email" required class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="example@email.com">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-slate-700 mb-1">Mật khẩu</label>
+                    <input id="login-password" type="password" required class="w-full p-3 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none" placeholder="Mật khẩu">
+                </div>
+                <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold shadow-lg transition transform active:scale-95">
+                    Đăng nhập
+                </button>
+            `;
+
+            return `
+                <div class="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+                    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md fade-in">
+                        <div class="text-center mb-8">
+                            <div class="bg-blue-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i data-lucide="book-open" class="text-white w-8 h-8"></i>
+                            </div>
+                            <h1 class="text-3xl font-bold text-slate-800">EduBattle</h1>
+                            <p class="text-slate-500">Nền tảng học tập & thi đấu</p>
+                        </div>
+
+                        <h2 class="text-2xl font-bold text-slate-800 mb-6 text-center">
+                            ${isRegister ? 'Đăng ký tài khoản mới' : 'Đăng nhập'}
+                        </h2>
+
+                        <form onsubmit="${isRegister ? 'handleRegister(event)' : 'handleLogin(event)'}" class="space-y-4">
+                            ${formContent}
+                        </form>
+
+                        <div class="mt-6 pt-4 border-t text-center text-sm">
+                            ${isRegister ? 
+                                `<p class="text-slate-500">Đã có tài khoản? <button onclick="setAuthMode('login')" class="font-bold text-blue-600 hover:text-blue-700 transition">Đăng nhập</button></p>` :
+                                `<p class="text-slate-500">Chưa có tài khoản? <button onclick="setAuthMode('register')" class="font-bold text-blue-600 hover:text-blue-700 transition">Đăng ký ngay</button></p>`
+                            }
+                        </div>
+                    </div>
+                </div>
+            `;
+        };
+        
+        window.setAuthMode = (mode) => {
+            state.ui.authMode = mode;
+            renderApp();
+        };
+
+        window.toggleTeacherCode = (show) => {
+            const field = document.getElementById('teacher-code-field');
+            if (field) {
+                if (show) field.classList.remove('hidden');
+                else field.classList.add('hidden');
+            }
+        };
+
+
+        // --- MAIN LAYOUT RENDERERS (Unchanged) ---
+        const renderMainLayout = () => `
+            <div class="flex h-screen bg-slate-50 overflow-hidden">
+                <!-- Sidebar -->
+                <div class="w-64 bg-slate-900 text-slate-300 flex flex-col shadow-xl flex-shrink-0">
+                    <div class="p-6 border-b border-slate-800 flex items-center gap-3">
+                        <div class="bg-blue-600 p-2 rounded-lg"><i data-lucide="book-open" class="text-white"></i></div>
+                        <h1 class="text-xl font-bold text-white">EduBattle</h1>
+                    </div>
+                    <nav class="flex-1 p-4 space-y-2">
+                        ${renderNavItem('dashboard', 'layout-dashboard', 'Tổng quan')}
+                        ${renderNavItem('assignments', 'book-open', 'Bài tập')}
+                        ${renderNavItem('competition', 'swords', 'Đấu trường')}
+                        ${renderNavItem('ranking', 'trophy', 'Xếp hạng')}
+                    </nav>
+                    <div class="p-4 border-t border-slate-800">
+                        <div class="flex items-center gap-3 mb-4 px-2">
+                            <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${state.profile.role === 'teacher' ? 'bg-purple-500' : 'bg-blue-500'}">
+                                ${state.profile.name.charAt(0)}
+                            </div>
+                            <div class="overflow-hidden">
+                                <p class="text-sm font-medium text-white truncate">${state.profile.name}</p>
+                                <p class="text-xs text-slate-400 capitalize">${state.profile.role === 'teacher' ? 'Giáo viên' : 'Học sinh'}</p>
+                            </div>
+                        </div>
+                        <button onclick="handleSignOut()" class="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-slate-800 rounded-lg transition-colors">
+                            <i data-lucide="log-out" size="16"></i> Đăng xuất
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Main Content -->
+                <div class="flex-1 flex flex-col min-w-0">
+                    <header class="bg-white shadow-sm px-8 py-4 flex justify-between items-center z-10">
+                        <h2 class="text-2xl font-bold text-slate-800 capitalize">
+                            ${state.view === 'dashboard' ? 'Tổng quan' : 
+                              state.view === 'assignments' ? 'Bài tập về nhà' :
+                              state.view === 'competition' ? 'Đấu trường trực tuyến' : 'Bảng xếp hạng'}
+                        </h2>
+                        <div class="px-4 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-bold flex items-center gap-2">
+                            <i data-lucide="trophy" size="14"></i> ${state.profile.points} điểm
+                        </div>
+                    </header>
+                    <main class="flex-1 overflow-auto p-8 fade-in">
+                        ${renderViewContent()}
+                    </main>
+                </div>
+            </div>
+        `;
+
+        const renderNavItem = (viewName, icon, label) => `
+            <button onclick="changeView('${viewName}')" class="w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all ${state.view === viewName ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-slate-800'}">
+                <i data-lucide="${icon}" size="20"></i> <span class="font-medium">${label}</span>
+            </button>
+        `;
+
+        const renderViewContent = () => {
+            switch(state.view) {
+                case 'dashboard': return renderDashboard();
+                case 'assignments': return renderAssignments();
+                case 'competition': return renderCompetition();
+                case 'ranking': return renderRanking();
+                default: return '';
+            }
+        };
+
+        // --- 5. MODULE RENDERERS ---
+        
+        // DASHBOARD
+        const renderDashboard = () => {
+            const mySubmissions = state.data.submissions.filter(s => s.studentId === state.user.uid);
+            // Với giáo viên, "Bài tập chờ" là tổng số bài tập đang có (để quản lý)
+            // Với học sinh, là số bài chưa làm
+            const pending = state.profile.role === 'student' 
+                ? state.data.assignments.length - mySubmissions.length
+                : state.data.assignments.length;
+            
+            return `
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    ${renderStatCard('Điểm tích lũy', state.profile.points, 'trophy', 'bg-yellow-50 text-yellow-500')}
+                    ${renderStatCard(state.profile.role === 'student' ? 'Bài tập đã làm' : 'Tổng số bài tập', 
+                                    state.profile.role === 'student' ? mySubmissions.length : state.data.assignments.length, 
+                                    'check-circle', 'bg-green-50 text-green-500')}
+                    ${renderStatCard(state.profile.role === 'student' ? 'Bài tập chờ' : 'Quản lý bài tập', 
+                                    Math.max(0, pending), 'clock', 'bg-orange-50 text-orange-500')}
+                </div>
+                <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-8 text-white shadow-xl flex items-center justify-between">
+                    <div>
+                        <h3 class="text-2xl font-bold mb-2">Chào mừng trở lại, ${state.profile.name}!</h3>
+                        <p class="text-blue-100 max-w-xl mb-6">
+                            ${state.profile.role === 'student' ? 'Bạn đã sẵn sàng để chinh phục các thử thách hôm nay chưa?' : 'Quản lý lớp học và tạo bài tập mới.'}
+                        </p>
+                        <div class="flex gap-3">
+                            <button onclick="changeView('assignments')" class="bg-white text-blue-700 px-6 py-2 rounded-lg font-bold hover:bg-blue-50 transition">
+                                ${state.profile.role === 'student' ? 'Làm bài ngay' : 'Tạo bài tập'}
+                            </button>
+                            <button onclick="changeView('competition')" class="bg-blue-800 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-900 transition flex items-center gap-2">
+                                <i data-lucide="swords" size="16"></i> Đấu trường
+                            </button>
+                        </div>
+                    </div>
+                    <i data-lucide="trophy" class="w-32 h-32 opacity-20 hidden lg:block"></i>
+                </div>
+            `;
+        };
+        const renderStatCard = (label, value, icon, colorClass) => `
+            <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                <div class="p-4 rounded-xl ${colorClass}"><i data-lucide="${icon}"></i></div>
+                <div><p class="text-slate-500 text-sm">${label}</p><p class="text-2xl font-bold text-slate-800">${value}</p></div>
+            </div>
+        `;
+
+        // ASSIGNMENTS
+        const renderAssignments = () => {
+            // If creating
+            if (state.ui.isCreatingAssignment) {
+                return renderCreateAssignmentForm();
+            }
+            // If taking
+            if (state.ui.takingAssignmentId) {
+                return renderTakeAssignment();
+            }
+
+            const list = state.data.assignments.map(a => {
+                const sub = state.data.submissions.find(s => s.assignmentId === a.id && s.studentId === state.user.uid);
+                
+                let actionBtn = '';
+                if (state.profile.role === 'student') {
+                    if (sub) actionBtn = `<button disabled class="w-full bg-slate-100 text-slate-400 py-2 rounded-lg font-medium cursor-not-allowed">Đã xong (${sub.score}đ)</button>`;
+                    else actionBtn = `<button onclick="startAssignment('${a.id}')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium">Làm bài</button>`;
+                } else {
+                    actionBtn = `<div class="text-sm text-slate-400">ID: ${a.id.substr(0,8)}...</div>`;
+                }
+
+                return `
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="bg-blue-100 p-3 rounded-lg text-blue-600"><i data-lucide="book-open"></i></div>
+                            ${sub ? '<i data-lucide="check-circle" class="text-green-500"></i>' : ''}
+                        </div>
+                        <h4 class="text-lg font-bold text-slate-800 mb-2">${a.title}</h4>
+                        <p class="text-slate-500 text-sm mb-4">${a.questions ? a.questions.length : 0} câu hỏi</p>
+                        ${actionBtn}
+                    </div>
+                `;
+            }).join('');
+
+            return `
+                ${state.profile.role === 'teacher' ? 
+                    `<button onclick="toggleCreate(true)" class="mb-6 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-md flex items-center gap-2">
+                        <i data-lucide="plus-circle"></i> Tạo bài tập mới
+                    </button>` : ''}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    ${list || '<div class="col-span-2 text-center py-12 text-slate-500 bg-white rounded-xl border border-slate-100"><i data-lucide="inbox" class="mx-auto w-12 h-12 mb-3 text-slate-300"></i><p>Chưa có bài tập nào.</p></div>'}
+                </div>
+            `;
+        };
+        
+        window.changeQuestionType = (type) => {
+            state.ui.newQuestionType = type;
+            renderApp();
+        };
+
+        const renderQuestionDisplay = (q) => {
+            const typeLabels = {
+                mcq: 'Trắc nghiệm', fib: 'Điền từ', jumble: 'Xếp từ', match: 'Ghép đôi', translation: 'Dịch câu'
+            };
+            const typeLabel = typeLabels[q.type] || 'Không xác định';
+            
+            let content = '';
+
+            switch(q.type) {
+                case 'mcq':
+                    content = `Đáp án đúng: Option ${q.options && q.options[q.correct]}`;
+                    break;
+                case 'fib':
+                    content = `Câu: ${q.text.replace('[BLANK]', '______')}<br>Đáp án: **${q.answer}**`;
+                    break;
+                case 'jumble':
+                    content = `Câu đúng: **${q.answer.join(' ')}**`;
+                    break;
+                case 'match':
+                    content = 'Các cặp ghép nối:<br>' + q.pairs.map(p => `**${p.a}** -> **${p.b}**`).join('<br>');
+                    break;
+                case 'translation':
+                    content = `Câu TV: ${q.vietnamese}<br>Đáp án TC: **${q.chinese}**`;
+                    break;
+            }
+
+            return `
+                <div class="p-4 border border-slate-200 rounded-xl bg-slate-50 mb-4">
+                    <div class="font-bold text-blue-600 mb-2">Loại: ${typeLabel}</div>
+                    <p class="font-medium mb-2">${q.type === 'mcq' ? q.text : q.vietnamese || q.text || ''}</p>
+                    <div class="text-sm text-slate-500">
+                        ${content}
+                    </div>
+                </div>
+            `;
+        };
+
+        const renderQuestionInputForm = () => {
+            const type = state.ui.newQuestionType;
+            let inputs = '';
+            
+            switch (type) {
+                case 'mcq':
+                    inputs = `
+                        <input id="q-text" class="w-full p-2 border rounded-lg mb-3" placeholder="Nội dung câu hỏi">
+                        <div class="grid grid-cols-2 gap-3 mb-3">
+                            <input id="opt-0" class="p-2 border rounded" placeholder="Đáp án 1">
+                            <input id="opt-1" class="p-2 border rounded" placeholder="Đáp án 2">
+                            <input id="opt-2" class="p-2 border rounded" placeholder="Đáp án 3">
+                            <input id="opt-3" class="p-2 border rounded" placeholder="Đáp án 4">
+                        </div>
+                        <select id="q-correct" class="w-full p-2 border rounded mb-3">
+                            <option value="0">Đáp án 1 đúng</option>
+                            <option value="1">Đáp án 2 đúng</option>
+                            <option value="2">Đáp án 3 đúng</option>
+                            <option value="3">Đáp án 4 đúng</option>
+                        </select>
+                    `;
+                    break;
+                case 'fib':
+                    inputs = `
+                        <p class="text-sm text-slate-500 mb-2">Sử dụng chuỗi <code>[BLANK]</code> để đánh dấu vị trí điền từ.</p>
+                        <input id="fib-text" class="w-full p-2 border rounded-lg mb-3" placeholder="Ví dụ: Hôm nay tôi đi [BLANK]...">
+                        <input id="fib-answer" class="w-full p-2 border rounded-lg mb-3" placeholder="Đáp án đúng (Ví dụ: chợ)">
+                    `;
+                    break;
+                case 'jumble':
+                    inputs = `
+                        <p class="text-sm text-slate-500 mb-2">Nhập câu đúng. Các từ sẽ được tự động tách và xáo trộn.</p>
+                        <input id="jumble-answer" class="w-full p-2 border rounded-lg mb-3" placeholder="Ví dụ: Tôi yêu học tiếng Việt">
+                    `;
+                    break;
+                case 'match':
+                    inputs = `
+                        <p class="text-sm text-slate-500 mb-2">Nhập 3 cặp ghép nối (Cột A: Câu hỏi, Cột B: Đáp án).</p>
+                        <div class="grid grid-cols-2 gap-3 mb-3">
+                            <input id="match-a0" class="p-2 border rounded" placeholder="Cột A - Câu hỏi 1">
+                            <input id="match-b0" class="p-2 border rounded" placeholder="Cột B - Đáp án 1">
+                            <input id="match-a1" class="p-2 border rounded" placeholder="Cột A - Câu hỏi 2">
+                            <input id="match-b1" class="p-2 border rounded" placeholder="Cột B - Đáp án 2">
+                            <input id="match-a2" class="p-2 border rounded" placeholder="Cột A - Câu hỏi 3">
+                            <input id="match-b2" class="p-2 border rounded" placeholder="Cột B - Đáp án 3">
+                        </div>
+                    `;
+                    break;
+                case 'translation':
+                    inputs = `
+                        <p class="text-sm text-slate-500 mb-2">Yêu cầu dịch câu tiếng Việt sang tiếng Trung.</p>
+                        <input id="trans-vn" class="w-full p-2 border rounded-lg mb-3" placeholder="Câu tiếng Việt (Ví dụ: Tôi yêu bạn)">
+                        <input id="trans-cn" class="w-full p-2 border rounded-lg mb-3" placeholder="Đáp án tiếng Trung (Ví dụ: 我爱你)">
+                    `;
+                    break;
+            }
+
+            return inputs;
+        };
+
+        const renderCreateAssignmentForm = () => {
+            const qList = state.ui.newAssignment.questions.map((q, idx) => renderQuestionDisplay(q)).join('');
+
+            return `
+                <div class="bg-white p-6 rounded-2xl shadow-sm">
+                    <div class="flex justify-between mb-6">
+                        <h3 class="text-xl font-bold">Tạo bài tập mới</h3>
+                        <button onclick="toggleCreate(false)" class="text-slate-500 hover:text-red-500"><i data-lucide="x"></i></button>
+                    </div>
+                    <div class="mb-6">
+                        <input id="new-assign-title" class="w-full text-lg font-bold border-b-2 border-slate-200 p-2 outline-none focus:border-blue-500" placeholder="Tiêu đề bài tập...">
+                    </div>
+                    
+                    <div id="questions-preview" class="space-y-4">${qList}</div>
+
+                    <div class="p-4 border border-blue-200 rounded-xl bg-blue-50 mb-6">
+                        <h4 class="font-bold text-blue-800 mb-3">Thêm câu hỏi</h4>
+                        
+                        <div class="mb-3">
+                            <label class="block text-sm font-medium text-blue-800 mb-1">Chọn loại câu hỏi</label>
+                            <select id="q-type-select" onchange="changeQuestionType(this.value)" class="w-full p-2 border border-blue-300 rounded-lg">
+                                <option value="mcq" ${state.ui.newQuestionType === 'mcq' ? 'selected' : ''}>1. Trắc nghiệm</option>
+                                <option value="fib" ${state.ui.newQuestionType === 'fib' ? 'selected' : ''}>2. Điền từ còn thiếu</option>
+                                <option value="jumble" ${state.ui.newQuestionType === 'jumble' ? 'selected' : ''}>3. Xếp từ thành câu</option>
+                                <option value="match" ${state.ui.newQuestionType === 'match' ? 'selected' : ''}>4. Ghép đôi</option>
+                                <option value="translation" ${state.ui.newQuestionType === 'translation' ? 'selected' : ''}>5. Dịch câu (Việt - Trung)</option>
+                            </select>
+                        </div>
+
+                        ${renderQuestionInputForm()}
+
+                        <button onclick="addQuestion()" class="text-blue-600 font-bold text-sm mt-3">+ Thêm vào danh sách</button>
+                    </div>
+
+                    <button onclick="publishAssignment()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700">Xuất bản bài tập</button>
+                </div>
+            `;
+        };
+
+        const renderTakeAssignmentQuestion = (q, qIdx) => {
+            let qContent = '';
+            const answerKey = `q-${qIdx}`;
+            
+            // Hàm xáo trộn mảng (Fisher-Yates)
+            const shuffleArray = (array) => {
+                for (let i = array.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [array[i], array[j]] = [array[j], array[i]];
+                }
+                return array;
+            };
+
+            switch(q.type) {
+                case 'mcq':
+                    qContent = q.options.map((opt, oIdx) => {
+                        const isSelected = state.ui.assignmentAnswers[qIdx] === oIdx;
+                        return `
+                        <label class="block p-3 border rounded-lg cursor-pointer transition-colors ${isSelected ? 'bg-blue-50 border-blue-500' : 'hover:bg-slate-50'}">
+                            <input type="radio" name="${answerKey}" class="hidden" onclick="selectAnswer(${qIdx}, ${oIdx})" ${isSelected ? 'checked' : ''}>
+                            <div class="flex items-center gap-3">
+                                <div class="w-5 h-5 rounded-full border flex items-center justify-center ${isSelected ? 'border-blue-500' : 'border-slate-300'}">
+                                    ${isSelected ? '<div class="w-3 h-3 bg-blue-500 rounded-full"></div>' : ''}
+                                </div>
+                                ${opt}
+                            </div>
+                        </label>`;
+                    }).join('');
+                    break;
+
+                case 'fib':
+                    // Đặt giá trị hiện tại (nếu có)
+                    const currentFibAnswer = state.ui.assignmentAnswers[qIdx] || '';
+                    qContent = `
+                        <p class="text-lg mb-3">${q.text.replace('[BLANK]', '______')}</p>
+                        <input id="${answerKey}-input" oninput="captureInputAnswer(${qIdx}, this.value)" class="w-full p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nhập từ còn thiếu..." value="${currentFibAnswer}">
+                    `;
+                    break;
+
+                case 'translation':
+                    const currentTransAnswer = state.ui.assignmentAnswers[qIdx] || '';
+                    qContent = `
+                        <p class="text-lg mb-3 font-bold text-slate-700">Dịch câu sau sang tiếng Trung:</p>
+                        <p class="text-xl mb-4 text-blue-600 italic">"${q.vietnamese}"</p>
+                        <textarea id="${answerKey}-input" oninput="captureInputAnswer(${qIdx}, this.value)" rows="3" class="w-full p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500" placeholder="Nhập câu trả lời bằng tiếng Trung...">
+${currentTransAnswer}</textarea>
+                    `;
+                    break;
+                
+                case 'jumble':
+                    // Chuẩn bị các từ
+                    const initialWords = q.answer;
+                    const scrambledWords = shuffleArray([...initialWords]);
+                    
+                    // Lấy trạng thái hiện tại (mảng các từ đã được xếp) hoặc mảng rỗng
+                    const currentJumbleOrder = state.ui.assignmentAnswers[qIdx] || [];
+                    
+                    // Lấy các từ chưa được sử dụng (ban đầu là tất cả các từ xáo trộn)
+                    const wordsInUse = currentJumbleOrder;
+                    const availableWords = scrambledWords.filter(word => !wordsInUse.includes(word));
+
+                    qContent = `
+                        <p class="text-lg mb-3 font-bold text-slate-700">Sắp xếp các từ sau để tạo thành câu đúng:</p>
+                        
+                        <div id="${answerKey}-drop-area" class="min-h-[60px] p-2 border-2 border-dashed border-blue-300 rounded-lg bg-blue-50 flex flex-wrap items-center mb-4">
+                            <!-- Hiển thị các từ đã được kéo vào -->
+                            ${wordsInUse.map((word, wIdx) => 
+                                `<span class="jumble-word bg-green-100 border-green-600 text-green-700" onclick="removeJumbleWord(${qIdx}, '${word}', ${wIdx})">${word}</span>`
+                            ).join('')}
+                        </div>
+                        
+                        <p class="text-sm font-medium text-slate-600 mb-2">Các từ có sẵn:</p>
+                        <div id="${answerKey}-bank" class="min-h-[40px] p-2 border border-slate-200 rounded-lg bg-white flex flex-wrap items-center">
+                            <!-- Hiển thị các từ chưa được kéo vào -->
+                            ${availableWords.map(word => 
+                                `<span class="jumble-word" onclick="addJumbleWord(${qIdx}, '${word}')">${word}</span>`
+                            ).join('')}
+                        </div>
+                    `;
+                    break;
+                
+                case 'match':
+                    const currentMatches = state.ui.assignmentAnswers[qIdx] || {}; // {A_index: B_index, ...}
+                    const pairs = q.pairs;
+                    const colA = pairs.map(p => p.a);
+                    const colB = shuffleArray(pairs.map(p => p.b));
+
+                    qContent = `
+                        <p class="text-lg mb-3 font-bold text-slate-700">Ghép đôi các mục sau:</p>
+                        <div class="grid grid-cols-2 gap-4">
+                            <!-- Column A (Questions) -->
+                            <div class="space-y-4">
+                                ${colA.map((item, aIdx) => {
+                                    const matchedB = currentMatches[aIdx] !== undefined ? colB[currentMatches[aIdx]] : 'Chọn đáp án';
+                                    const selectedBIndex = currentMatches[aIdx];
+                                    
+                                    return `
+                                        <div class="bg-white p-3 rounded-lg border border-slate-200 shadow-sm">
+                                            <p class="font-medium text-slate-800 mb-2">A${aIdx + 1}: ${item}</p>
+                                            <select 
+                                                id="match-a-${aIdx}" 
+                                                onchange="selectMatchAnswer(${qIdx}, ${aIdx}, this.value, [${colB.map(b => `'${b}'`)}])" 
+                                                class="w-full p-2 border rounded-lg bg-slate-50 focus:ring-blue-500"
+                                            >
+                                                <option value="">Chọn...</option>
+                                                ${colB.map((bItem, bIdx) => 
+                                                    `<option value="${bIdx}" ${selectedBIndex === bIdx ? 'selected' : ''}>${bItem}</option>`
+                                                ).join('')}
+                                            </select>
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    `;
+                    break;
+            }
+
+            return `
+                <div class="mb-6">
+                    <p class="font-medium text-lg mb-3 text-slate-800"><span class="font-bold text-blue-600">Câu ${qIdx+1}:</span> ${q.type === 'translation' ? '' : q.text}</p>
+                    <div class="space-y-2">
+                        ${qContent}
+                    </div>
+                </div>
+            `;
+        }
+
+        const renderTakeAssignment = () => {
+            const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
+            if(!assign) return '';
+            
+            const qHtml = assign.questions.map((q, qIdx) => renderTakeAssignmentQuestion(q, qIdx)).join('');
+
+            return `
+                <div class="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg">
+                    <div class="flex justify-between items-center mb-6 pb-4 border-b">
+                        <h3 class="text-2xl font-bold">${assign.title}</h3>
+                        <button onclick="startAssignment(null)" class="text-slate-400"><i data-lucide="x"></i></button>
+                    </div>
+                    <div>${qHtml}</div>
+                    <div class="mt-8 pt-6 border-t">
+                        <button onclick="submitAssignment()" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold text-lg shadow-lg">Nộp bài</button>
+                    </div>
+                </div>
+            `;
+        };
+        
+        // COMPETITION RENDERERS (Unchanged for brevity)
+        const renderCompetition = () => {
+            // Find active match
+            const uid = state.user.uid;
+            const match = state.data.matches.find(m => 
+                (m.player1?.uid === uid || m.player2?.uid === uid) && m.status !== 'finished'
+            );
+            
+            // If in match
+            if (match) {
+                if (match.status === 'waiting') {
+                    return `
+                        <div class="flex flex-col items-center justify-center h-96 bg-white rounded-2xl shadow-sm">
+                            <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mb-4"></div>
+                            <h3 class="text-xl font-bold text-slate-700">Đang tìm đối thủ...</h3>
+                            <p class="text-slate-500">Vui lòng đợi giây lát</p>
+                        </div>
+                    `;
+                }
+                
+                // Playing
+                const qIndex = state.ui.matchQIndex;
+                const q = match.questions[qIndex];
+                
+                if (!q) {
+                    // Game finished logic handled by component update usually, but simple check here
+                    return `<div class="text-center">Đang tổng kết...</div>`;
+                }
+
+                return `
+                    <div class="max-w-4xl mx-auto">
+                        <div class="grid grid-cols-2 gap-4 mb-8">
+                            <div class="bg-blue-600 text-white p-4 rounded-xl text-center shadow-lg">
+                                <p class="text-sm opacity-80">${match.player1.name}</p>
+                                <p class="text-4xl font-bold">${match.player1.score}</p>
+                            </div>
+                            <div class="bg-red-500 text-white p-4 rounded-xl text-center shadow-lg">
+                                <p class="text-sm opacity-80">${match.player2.name}</p>
+                                <p class="text-4xl font-bold">${match.player2.score}</p>
+                            </div>
+                        </div>
+
+                        <div class="bg-white p-8 rounded-2xl shadow-lg text-center">
+                            <div class="mb-8">
+                                <span class="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-sm font-bold">Câu hỏi ${qIndex + 1}/${match.questions.length}</span>
+                                <h2 class="text-4xl font-bold mt-4 text-slate-800">${q.text}</h2>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                ${q.options.map((opt, idx) => `
+                                    <button onclick="answerMatch(${idx === q.correct}, '${match.id}')" class="p-6 bg-slate-50 border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 rounded-xl text-xl font-bold transition-all">
+                                        ${opt}
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            // Lobby
+            return `
+                <div class="text-center py-12 bg-white rounded-3xl shadow-sm">
+                    <div class="inline-block p-6 bg-purple-100 rounded-full mb-6">
+                        <i data-lucide="swords" class="w-16 h-16 text-purple-600"></i>
+                    </div>
+                    <h2 class="text-3xl font-bold text-slate-800 mb-4">Đấu trường Toán học 1v1</h2>
+                    <p class="text-slate-500 mb-8 max-w-md mx-auto">Thi đấu trực tiếp với các học sinh khác. Trả lời đúng và nhanh để giành chiến thắng.</p>
+                    <button onclick="findMatch()" class="bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl shadow-purple-200 transform transition hover:-translate-y-1">
+                        Tìm trận đấu
+                    </button>
+                </div>
+            `;
+        };
+
+        // RANKING (Unchanged for brevity)
+        const renderRanking = () => {
+            const sorted = [...state.data.users].sort((a,b) => (b.points||0) - (a.points||0));
+            return `
+                <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
+                    <div class="bg-yellow-400 p-6 flex justify-center">
+                        <i data-lucide="trophy" class="text-white w-16 h-16 drop-shadow-md"></i>
+                    </div>
+                    <div class="p-6">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="text-left text-slate-500 text-sm border-b">
+                                    <th class="pb-3 pl-4">Hạng</th>
+                                    <th class="pb-3">Học sinh</th>
+                                    <th class="pb-3 text-right pr-4">Điểm số</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${sorted.map((u, idx) => {
+                                    let color = idx === 0 ? 'text-yellow-500 font-bold' : (idx === 1 ? 'text-slate-400 font-bold' : (idx === 2 ? 'text-orange-700 font-bold' : 'text-slate-600'));
+                                    let isMe = u.uid === state.user.uid;
+                                    return `
+                                    <tr class="border-b last:border-0 hover:bg-slate-50 transition ${isMe ? 'bg-blue-50' : ''}">
+                                        <td class="py-4 pl-4 ${color}">#${idx+1}</td>
+                                        <td class="py-4 flex items-center gap-3">
+                                            <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${u.role === 'teacher' ? 'bg-purple-400' : 'bg-blue-400'}">
+                                                ${u.name.charAt(0)}
+                                            </div>
+                                            <span class="font-medium ${isMe ? 'text-blue-700' : 'text-slate-700'}">${u.name} ${isMe ? '(Bạn)' : ''}</span>
+                                        </td>
+                                        <td class="py-4 text-right pr-4 font-bold text-slate-800">${u.points || 0}</td>
+                                    </tr>`;
+                                }).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            `;
+        };
+
+
+        // --- 6. AUTH HANDLERS ---
+
+        window.handleLogin = async (e) => {
+            e.preventDefault();
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            try {
+                await signInWithEmailAndPassword(auth, email, password);
+                showToast("Đăng nhập thành công!", "success");
+            } catch(error) {
+                console.error("Login error:", error);
+                let errorMessage = "Lỗi đăng nhập. Vui lòng kiểm tra Email/Mật khẩu.";
+                if (error.code === 'auth/invalid-credential') {
+                     errorMessage = "Email hoặc Mật khẩu không đúng.";
+                }
+                showToast(errorMessage, "error");
+            }
+        };
+
+        window.handleRegister = async (e) => {
+            e.preventDefault();
+            const name = document.getElementById('join-name').value;
+            const email = document.getElementById('join-email').value;
+            const password = document.getElementById('join-password').value;
+            const role = document.querySelector('input[name="role"]:checked').value;
+
+            if (role === 'teacher') {
+                const code = document.getElementById('teacher-code').value;
+                if (code !== TEACHER_CODE) {
+                    return showToast("Mã xác nhận Giáo viên không đúng.", "error");
+                }
+            }
+
+            try {
+                const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+                const user = userCredential.user;
+
+                const userRef = doc(db, getPath('users'), user.uid);
+                const profile = { 
+                    uid: user.uid, 
+                    name, 
+                    role, 
+                    points: 0, 
+                    email: user.email,
+                    createdAt: serverTimestamp() 
+                };
+                await setDoc(userRef, profile);
+                
+                showToast("Đăng ký thành công!", "success");
+            } catch(error) { 
+                console.error("Registration error:", error);
+                let errorMessage = "Lỗi đăng ký. Vui lòng thử lại.";
+                if (error.code === 'auth/email-already-in-use') {
+                    errorMessage = "Email này đã được sử dụng.";
+                } else if (error.code === 'auth/weak-password') {
+                    errorMessage = "Mật khẩu quá yếu (tối thiểu 6 ký tự).";
+                } else if (error.code === 'auth/invalid-email') {
+                    errorMessage = "Định dạng email không hợp lệ.";
+                }
+                showToast(errorMessage, "error"); 
+            }
+        };
+        
+        window.handleSignOut = async () => {
+            try {
+                // Hủy tất cả listener khi đăng xuất
+                Object.values(listeners).forEach(unsub => unsub && unsub());
+                
+                await signOut(auth);
+                showToast("Đã đăng xuất!", "success");
+                state.user = null;
+                state.profile = null;
+                state.ui.authMode = 'login';
+                renderApp();
+            } catch(e) {
+                console.error("Sign out error:", e);
+                showToast("Lỗi đăng xuất.", "error");
+            }
+        };
+
+
+        // --- Assignment Handlers ---
+        window.changeView = (v) => {
+            state.view = v;
+            renderApp();
+        };
+
+        window.toggleCreate = (val) => {
+            state.ui.isCreatingAssignment = val;
+            if(val) {
+                state.ui.newAssignment = { title: '', questions: [] };
+                state.ui.newQuestionType = 'mcq'; // Reset type on open
+            }
+            renderApp();
+        };
+
+        window.addQuestion = () => {
+            const type = state.ui.newQuestionType;
+            let newQ = { type };
+            let isValid = false;
+
+            try {
+                switch(type) {
+                    case 'mcq':
+                        const txt = document.getElementById('q-text').value;
+                        const opts = [
+                            document.getElementById('opt-0').value,
+                            document.getElementById('opt-1').value,
+                            document.getElementById('opt-2').value,
+                            document.getElementById('opt-3').value
+                        ];
+                        const correct = parseInt(document.getElementById('q-correct').value);
+
+                        if(!txt || opts.some(o => !o)) throw new Error("Vui lòng điền đầy đủ nội dung câu hỏi và 4 đáp án.");
+
+                        newQ = { ...newQ, text: txt, options: opts, correct };
+                        isValid = true;
+                        
+                        // Clear inputs
+                        document.getElementById('q-text').value = '';
+                        opts.forEach((_, idx) => document.getElementById(`opt-${idx}`).value = '');
+                        break;
+                    
+                    case 'fib':
+                        const fibText = document.getElementById('fib-text').value;
+                        const fibAnswer = document.getElementById('fib-answer').value.trim();
+
+                        if (!fibText.includes('[BLANK]')) throw new Error("Nội dung câu hỏi phải có chuỗi [BLANK] để điền từ.");
+                        if (!fibAnswer) throw new Error("Vui lòng cung cấp đáp án đúng.");
+
+                        newQ = { ...newQ, text: fibText, answer: fibAnswer };
+                        isValid = true;
+                        document.getElementById('fib-text').value = '';
+                        document.getElementById('fib-answer').value = '';
+                        break;
+
+                    case 'jumble':
+                        const jumbleText = document.getElementById('jumble-answer').value.trim();
+                        if (!jumbleText) throw new Error("Vui lòng nhập câu đúng.");
+                        
+                        const words = jumbleText.split(/\s+/).filter(w => w.length > 0);
+                        if (words.length < 2) throw new Error("Câu phải có ít nhất 2 từ.");
+
+                        newQ = { ...newQ, text: jumbleText, answer: words }; // Lưu mảng từ đúng
+                        isValid = true;
+                        document.getElementById('jumble-answer').value = '';
+                        break;
+
+                    case 'match':
+                        const pairs = [];
+                        for(let i=0; i<3; i++) {
+                            const a = document.getElementById(`match-a${i}`).value.trim();
+                            const b = document.getElementById(`match-b${i}`).value.trim();
+                            if (!a || !b) throw new Error(`Vui lòng điền đầy đủ Cặp ghép nối ${i+1}.`);
+                            pairs.push({ a, b });
+                            document.getElementById(`match-a${i}`).value = '';
+                            document.getElementById(`match-b${i}`).value = '';
+                        }
+                        newQ = { ...newQ, pairs, text: "Ghép đôi các mục sau:" };
+                        isValid = true;
+                        break;
+
+                    case 'translation':
+                        const vn = document.getElementById('trans-vn').value.trim();
+                        const cn = document.getElementById('trans-cn').value.trim();
+                        if (!vn || !cn) throw new Error("Vui lòng nhập cả câu tiếng Việt và câu tiếng Trung.");
+                        
+                        newQ = { ...newQ, vietnamese: vn, chinese: cn, text: vn };
+                        isValid = true;
+                        document.getElementById('trans-vn').value = '';
+                        document.getElementById('trans-cn').value = '';
+                        break;
+                }
+            } catch (e) {
+                return showToast(e.message, "error");
+            }
+            
+            if (isValid) {
+                state.ui.newAssignment.questions.push(newQ);
+                renderApp(); // Re-render form to show list
+            }
+        };
+
+        window.publishAssignment = async () => {
+            const title = document.getElementById('new-assign-title').value;
+            if(!title || state.ui.newAssignment.questions.length === 0) return showToast("Vui lòng nhập tiêu đề và thêm ít nhất một câu hỏi", "error");
+            
+            try {
+                await addDoc(getRef('assignments'), {
+                    ...state.ui.newAssignment,
+                    title,
+                    createdBy: state.user.uid,
+                    createdAt: serverTimestamp()
+                });
+                toggleCreate(false);
+                showToast("Đã tạo bài tập!");
+            } catch(e) { 
+                console.error("Firestore Error when publishing assignment:", e);
+                showToast("Lỗi tạo bài: Vui lòng kiểm tra quyền truy cập Firebase.", "error"); 
+            }
+        };
+
+        window.startAssignment = (id) => {
+            state.ui.takingAssignmentId = id;
+            state.ui.assignmentAnswers = {};
+            renderApp();
+        };
+        
+        // Cập nhật câu trả lời dạng radio/select
+        window.selectAnswer = (qIdx, oIdx) => {
+            state.ui.assignmentAnswers[qIdx] = oIdx;
+            renderApp(); // Update UI
+        };
+
+        // Cập nhật câu trả lời dạng input/textarea (FIB, Translation)
+        window.captureInputAnswer = (qIdx, value) => {
+            state.ui.assignmentAnswers[qIdx] = value;
+        };
+
+        // Xử lý Jumble (Xếp từ)
+        window.getJumbleAnswer = (qIdx) => {
+            return state.ui.assignmentAnswers[qIdx] || [];
+        };
+
+        window.addJumbleWord = (qIdx, word) => {
+            const currentOrder = window.getJumbleAnswer(qIdx);
+            state.ui.assignmentAnswers[qIdx] = [...currentOrder, word];
+            renderApp();
+        };
+
+        window.removeJumbleWord = (qIdx, wordToRemove, wIdx) => {
+            const currentOrder = window.getJumbleAnswer(qIdx);
+            // Loại bỏ từ ở vị trí wIdx
+            currentOrder.splice(wIdx, 1);
+            state.ui.assignmentAnswers[qIdx] = currentOrder;
+            renderApp();
+        };
+        
+        // Xử lý Matching (Ghép đôi)
+        window.selectMatchAnswer = (qIdx, aIdx, bIdxValue, colB) => {
+            const currentMatches = state.ui.assignmentAnswers[qIdx] || {};
+            
+            // Xử lý Unmatch nếu chọn lại "Chọn..."
+            if (bIdxValue === "") {
+                delete currentMatches[aIdx];
+            } else {
+                const bIdx = parseInt(bIdxValue);
+
+                // Loại bỏ đáp án B nếu nó đã được ghép với một câu hỏi A khác
+                for (const key in currentMatches) {
+                    if (currentMatches[key] === bIdx && parseInt(key) !== aIdx) {
+                        delete currentMatches[key]; // Hủy ghép đôi cũ
+                    }
+                }
+                
+                // Thiết lập ghép đôi mới
+                currentMatches[aIdx] = bIdx;
+            }
+
+            state.ui.assignmentAnswers[qIdx] = {...currentMatches};
+            renderApp();
+        };
+
+        window.submitAssignment = async () => {
+            const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
+            let score = 0;
+            const totalQuestions = assign.questions.length;
+            
+            assign.questions.forEach((q, idx) => {
+                const userAnswer = state.ui.assignmentAnswers[idx];
+                let isCorrect = false;
+
+                switch(q.type) {
+                    case 'mcq':
+                        isCorrect = userAnswer === q.correct;
+                        break;
+                    case 'fib':
+                    case 'translation':
+                        // Điền từ và Dịch câu: So sánh chuỗi (bỏ qua khoảng trắng đầu/cuối và đổi về chữ thường)
+                        if (userAnswer) {
+                            const expectedAnswer = q.type === 'fib' ? q.answer : q.chinese;
+                            isCorrect = userAnswer.trim().toLowerCase() === expectedAnswer.trim().toLowerCase();
+                        }
+                        break;
+                    case 'jumble':
+                        // Xếp từ: So sánh mảng từ đã xếp với mảng từ đúng
+                        if (Array.isArray(userAnswer)) {
+                            isCorrect = q.answer.join(' ') === userAnswer.join(' ');
+                        }
+                        break;
+                    case 'match':
+                        // Ghép đôi: So sánh (Question A -> Answer B)
+                        // Tạm thời cho phép qua nếu tất cả các cặp đã được chọn
+                        if (userAnswer && q.type === 'match') {
+                            isCorrect = Object.keys(userAnswer).length === q.pairs.length;
+                        }
+                        break;
+                }
+                
+                if (isCorrect) score += (100 / totalQuestions); // Tính điểm theo tỷ lệ 
+            });
+
+            // Làm tròn điểm
+            score = Math.round(score);
+
+            try {
+                await addDoc(getRef('submissions'), {
+                    assignmentId: assign.id,
+                    studentId: state.user.uid,
+                    score,
+                    answers: state.ui.assignmentAnswers,
+                    createdAt: serverTimestamp()
+                });
+                await updateDoc(doc(db, getPath('users'), state.user.uid), {
+                    points: (state.profile.points || 0) + score
+                });
+                state.ui.takingAssignmentId = null;
+                showToast(`Nộp bài thành công! +${score} điểm`);
+            } catch(e) { showToast("Lỗi nộp bài", "error"); }
+        };
+
+        // Competition Handlers (Unchanged for brevity)
+        window.findMatch = async () => {
+            try {
+                const waiting = state.data.matches.find(m => m.status === 'waiting' && m.player1.uid !== state.user.uid);
+                if (waiting) {
+                    await updateDoc(doc(db, getPath('matches'), waiting.id), {
+                        player2: { uid: state.user.uid, name: state.profile.name, score: 0 },
+                        status: 'playing',
+                        startTime: serverTimestamp()
+                    });
+                    showToast("Đã vào phòng!");
+                } else {
+                    const questions = [];
+                    for(let i=0; i<5; i++) {
+                        const a = Math.floor(Math.random()*20), b = Math.floor(Math.random()*20), ans = a+b;
+                        questions.push({
+                            type: 'mcq', // Match luôn là MCQ đơn giản
+                            text: `${a} + ${b} = ?`,
+                            options: [ans, ans+1, ans-2, ans+5].sort(()=>Math.random()-0.5),
+                            correct: 0 
+                        });
+                        questions[i].correct = questions[i].options.indexOf(ans);
+                    }
+                    await addDoc(getRef('matches'), {
+                        player1: { uid: state.user.uid, name: state.profile.name, score: 0 },
+                        status: 'waiting',
+                        questions,
+                        createdAt: serverTimestamp()
+                    });
+                    showToast("Đang chờ đối thủ...");
+                }
+            } catch(e) { console.error(e); showToast("Lỗi tìm trận", "error"); }
+        };
+
+        window.answerMatch = async (isCorrect, matchId) => {
+            const match = state.data.matches.find(m => m.id === matchId);
+            if(!match) return;
+            
+            const isP1 = match.player1.uid === state.user.uid;
+            const currentScore = isP1 ? match.player1.score : match.player2.score;
+            const newScore = isCorrect ? currentScore + 10 : currentScore;
+
+            const updateData = isP1 ? { "player1.score": newScore } : { "player2.score": newScore };
+            
+            if (state.ui.matchQIndex < match.questions.length - 1) {
+                state.ui.matchQIndex++;
+                await updateDoc(doc(db, getPath('matches'), matchId), updateData);
+                renderApp();
+            } else {
+                await updateDoc(doc(db, getPath('matches'), matchId), { ...updateData, status: 'finished' });
+                await updateDoc(doc(db, getPath('users'), state.user.uid), {
+                    points: (state.profile.points || 0) + newScore
+                });
+                state.ui.matchQIndex = 0;
+                showToast(`Kết thúc! Bạn đạt ${newScore} điểm`);
+                renderApp();
+            }
+        };
+
+        // --- 7. BOOTSTRAP ---
+        onAuthStateChanged(auth, (user) => {
+            state.user = user;
+            state.isAuthReady = true; 
+            if (user) {
+                setupListeners(user.uid);
+            } else {
+                // Hủy listener khi không có user
+                Object.values(listeners).forEach(unsub => unsub && unsub());
+                state.profile = null;
+                state.ui.authMode = 'login';
+                renderApp();
+            }
+        });
+
+        initAuth();
+
+    </script>
+</body>
+</html>

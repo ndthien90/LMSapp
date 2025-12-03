@@ -26,7 +26,7 @@
             transition: background-color 0.2s;
             font-weight: 600;
         }
-        .jumble-word:hover { background-color: #b2dfdb; }
+        .jumble-word:hover { background-color = #b2dfdb; }
 
         /* Animation for correct answer flash */
         .flash-green {
@@ -57,6 +57,10 @@
             }
             #mobile-overlay.open {
                 display: block;
+            }
+            /* FIX QUAN TRỌNG: Thêm padding-bottom cho main trên mobile để tránh thanh nav bar che mất nội dung */
+            main {
+                padding-bottom: calc(1rem + 64px) !important; /* 1rem (p-4) + chiều cao của nav (h-16 = 64px) */
             }
         }
         @media (min-width: 1024px) {
@@ -108,6 +112,9 @@
         // --- 1. CONFIGURATION ---
         let appId, firebaseConfig;
         const TEACHER_CODE = "ruands10"; // Mã xác nhận giáo viên
+        
+        // --- MỚI: Biến toàn cục để lưu ID input đang focus ---
+        let focusedInputId = null;
 
         try {
             if (typeof __firebase_config !== 'undefined') {
@@ -653,6 +660,14 @@
         // --- Smart UI Update (Cho lỗi Scroll Jump) ---
         const updateMainContent = () => {
             const mainEl = document.querySelector('main');
+            
+            // --- BƯỚC 1: LƯU TRẠNG THÁI FOCUS ---
+            const activeElement = document.activeElement;
+            focusedInputId = null;
+            if (activeElement && (activeElement.tagName === 'INPUT' || activeElement.tagName === 'TEXTAREA') && activeElement.id) {
+                focusedInputId = activeElement.id;
+            }
+            
             if (mainEl) {
                 mainEl.innerHTML = renderViewContent();
                 renderIcons();
@@ -667,6 +682,21 @@
             if (state.ui.isImportingBankData) {
                  appEl.insertAdjacentHTML('beforeend', renderImportDataModal());
                  renderIcons();
+            }
+
+            // --- BƯỚC 2: KHÔI PHỤC FOCUS ---
+            if (focusedInputId) {
+                const newFocusedElement = document.getElementById(focusedInputId);
+                if (newFocusedElement) {
+                    newFocusedElement.focus();
+                    // Đặt con trỏ về cuối (để tránh lỗi focus nhưng con trỏ ở đầu)
+                    if (newFocusedElement.value) {
+                         const temp = newFocusedElement.value;
+                         newFocusedElement.value = '';
+                         newFocusedElement.value = temp;
+                    }
+                }
+                focusedInputId = null; // Reset sau khi khôi phục
             }
         }
         
@@ -838,8 +868,9 @@
                         </main>
                         
                         <!-- MỚI: Mobile Bottom Navigation -->
-                        <nav id="mobile-bottom-nav" class="fixed bottom-0 left-0 right-0 lg:hidden bg-white border-t border-slate-200 shadow-2xl z-20">
-                            <div class="flex justify-around items-center h-16">
+                        <!-- FIX: Đảm bảo z-index cao và chiều cao cố định -->
+                        <nav id="mobile-bottom-nav" class="fixed bottom-0 left-0 right-0 lg:hidden bg-white border-t border-slate-200 shadow-2xl z-20 h-16">
+                            <div class="flex justify-around items-center h-full">
                                 ${renderMobileNavItem('dashboard', 'layout-dashboard', 'Tổng quan')}
                                 ${state.profile.role === 'teacher' ? renderMobileNavItem('classes', 'graduation-cap', 'Lớp học') : ''}
                                 ${renderMobileNavItem('assignments', 'book-open', 'Bài tập')}
@@ -2105,10 +2136,12 @@
             
             if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(q.type)) {
                 const initialValue = userAnswer || '';
+                // THAY THẾ oninput bằng onblur để ngăn việc render liên tục
                 content = `
                     <div class="text-center mt-6">
                         <input type="text" id="${inputId}" 
-                            oninput="captureInputAnswer(${qIdx}, this.value)" 
+                            onfocus="focusedInputId = this.id"
+                            onblur="captureInputAnswer(${qIdx}, this.value, this.id)" 
                             value="${initialValue}"
                             class="w-full max-w-lg p-3 md:p-4 text-lg md:text-xl border-2 border-slate-300 rounded-xl focus:border-blue-500 outline-none text-center font-bold" 
                             placeholder="${placeholderText}" />
@@ -2133,6 +2166,15 @@
             
             const totalQuestions = assign.questions.length;
             const currentQ = assign.questions[qIndex];
+            
+            // --- BƯỚC 1: LƯU TRẠNG THÁI FOCUS TRƯỚC KHI RENDER ---
+            // Lấy ID của phần tử input đang focus (nếu có)
+            const activeElement = document.activeElement;
+            focusedInputId = null;
+            if (activeElement && activeElement.id && activeElement.closest('#assignment-question-content')) {
+                focusedInputId = activeElement.id;
+            }
+            
             const questionHtml = renderTakeAssignmentQuestion(currentQ, qIndex);
 
             // Gán lại nội dung câu hỏi
@@ -2169,6 +2211,16 @@
                     </button>
                 `;
             }
+            
+            // --- BƯỚC 2: KHÔI PHỤC FOCUS ---
+            if (focusedInputId) {
+                const newFocusedElement = document.getElementById(focusedInputId);
+                if (newFocusedElement) {
+                    newFocusedElement.focus();
+                }
+                focusedInputId = null; 
+            }
+
 
             renderIcons();
         };
@@ -2213,7 +2265,7 @@
                     <div id="assignment-question-content">${questionHtml}</div>
 
                     <div class="mt-8 pt-6 border-t flex justify-between items-center">
-                        <button id="prev-q-btn" onclick="goToPreviousQuestion()" 
+                        <button id="prev-q-btn" onclick="saveCurrentInputAndGoToPrevious()" 
                             class="flex items-center gap-2 px-4 md:px-6 py-2 md:py-3 rounded-xl font-bold transition text-sm md:text-base ${isFirst ? 'text-slate-400 cursor-not-allowed bg-slate-100' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'}" 
                             ${isFirst ? 'disabled' : ''}>
                             <i data-lucide="arrow-left" size="20"></i> Lùi
@@ -2221,11 +2273,11 @@
                         
                         <div id="next-q-btn-container">
                             ${isLast ? `
-                                <button onclick="submitAssignment()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-xl font-bold text-lg shadow-lg transition">
+                                <button onclick="saveCurrentInputAndSubmit()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-xl font-bold text-lg shadow-lg transition">
                                     <i data-lucide="send" size="20" class="inline-block mr-1"></i> Nộp bài
                                 </button>
                             ` : `
-                                <button id="next-q-btn" onclick="goToNextQuestion()" 
+                                <button id="next-q-btn" onclick="saveCurrentInputAndGoToNext()" 
                                     class="flex items-center gap-2 px-4 md:px-6 py-2 md:py-3 rounded-xl font-bold transition bg-blue-600 hover:bg-blue-700 text-white text-sm md:text-base">
                                     Tiến <i data-lucide="arrow-right" size="20"></i>
                                 </button>
@@ -2236,6 +2288,31 @@
             `;
         };
         
+        // MỚI: HÀM LƯU INPUT TRƯỚC KHI CHUYỂN TRANG
+        window.saveCurrentInput = () => {
+            const qIndex = state.ui.currentQuestionIndex;
+            const inputEl = document.getElementById(`input-q-${qIndex}`);
+            if (inputEl) {
+                state.ui.assignmentAnswers[qIndex] = inputEl.value;
+            }
+        };
+
+        window.saveCurrentInputAndGoToNext = () => {
+            saveCurrentInput();
+            goToNextQuestion();
+        };
+
+        window.saveCurrentInputAndGoToPrevious = () => {
+            saveCurrentInput();
+            goToPreviousQuestion();
+        };
+        
+        window.saveCurrentInputAndSubmit = () => {
+            saveCurrentInput();
+            submitAssignment();
+        };
+
+
         // MỚI: RENDER KẾT QUẢ BÀI NỘP (Cập nhật Responsive)
         const renderSubmissionResult = () => {
             const sub = state.ui.viewSubmission;
@@ -2549,15 +2626,30 @@
             // 5. Update Options
             const grid = document.getElementById('options-grid');
             const currentQId = grid.getAttribute('data-qid');
+            
+            // --- LƯU VÀ KHÔI PHỤC FOCUS CHO ARENA INPUT ---
+            const activeElement = document.activeElement;
+            focusedInputId = null;
+            if (activeElement && activeElement.id && activeElement.closest('#options-grid')) {
+                focusedInputId = activeElement.id;
+            }
+            // --- END LƯU FOCUS ---
+
 
             if (currentQId !== String(qIndex) || buttonsDisabled) { 
                 grid.setAttribute('data-qid', qIndex);
                 
                 if (q.type === 'arena_input') {
+                     const inputId = `arena-input-q-${qIndex}`;
+                     // Đọc giá trị hiện tại từ state hoặc giả định rỗng
+                     const inputValue = state.ui.assignmentAnswers[qIndex] || '';
+
                      grid.innerHTML = `
                         <div class="text-center mt-4 md:mt-6 col-span-full">
-                            <input type="text" id="arena-input-q-${qIndex}" 
-                                oninput="captureArenaInputAnswer(this.value)" 
+                            <input type="text" id="${inputId}" 
+                                onfocus="focusedInputId = this.id"
+                                onblur="captureArenaInputAnswer(this.value, ${qIndex})" 
+                                value="${inputValue}"
                                 class="w-full max-w-xl p-3 md:p-4 text-lg md:text-xl border-2 border-slate-300 rounded-xl focus:border-blue-500 outline-none text-center font-bold" 
                                 placeholder="Nhập câu tiếng Trung đã nghe..." 
                                 ${buttonsDisabled ? 'disabled' : ''} />
@@ -2576,6 +2668,15 @@
                     `).join('');
                 }
             }
+
+            // --- KHÔI PHỤC FOCUS CHO ARENA INPUT ---
+             if (focusedInputId) {
+                const newFocusedElement = document.getElementById(focusedInputId);
+                if (newFocusedElement) {
+                    newFocusedElement.focus();
+                }
+                focusedInputId = null; 
+            }
         };
 
         window.handleArenaInputAnswer = async (mid) => {
@@ -2584,21 +2685,23 @@
              
              const qIndex = match.qIndex || 0;
              const q = match.questions[qIndex];
-             const userAnswer = (document.getElementById(`arena-input-q-${qIndex}`).value || '').trim().toLowerCase();
+             const inputId = `arena-input-q-${qIndex}`;
+             // Lấy giá trị từ state (đã được cập nhật bởi onblur)
+             const userAnswer = (state.ui.assignmentAnswers[qIndex] || '').trim().toLowerCase(); 
              const correctAnswer = (q.correct || '').trim().toLowerCase();
 
              const isCorrect = userAnswer === correctAnswer;
              
              state.ui.hasAnsweredCurrentQ = true;
              
-             const inputEl = document.getElementById(`arena-input-q-${qIndex}`);
-             inputEl.disabled = true;
+             const inputEl = document.getElementById(inputId);
+             if (inputEl) inputEl.disabled = true; // Vô hiệu hóa input sau khi trả lời
              
              if (isCorrect) {
-                  inputEl.classList.add('bg-green-100', 'border-green-600');
+                 if (inputEl) inputEl.classList.add('bg-green-100', 'border-green-600');
                   showToast("Chính xác!", "success");
              } else {
-                 inputEl.classList.add('bg-red-100', 'border-red-600');
+                 if (inputEl) inputEl.classList.add('bg-red-100', 'border-red-600');
                  showToast(`Sai! Đáp án đúng là: ${q.correct}`, "error");
              }
              
@@ -2652,7 +2755,11 @@
              }
         }
         
-        window.captureArenaInputAnswer = (value) => {};
+        // --- SỬA LỖI MOBILE FOCUS: LƯU VÀO STATE KHI MẤT FOCUS ---
+        window.captureArenaInputAnswer = (value, qIndex) => { 
+            state.ui.assignmentAnswers[qIndex] = value;
+            // KHÔNG RENDER APP
+        };
         
         window.handleAnswerAttempt = async (isCorrect, mid, optionIndex) => {
              const match = state.ui.activeMatch;
@@ -3938,18 +4045,23 @@
         }
 
 
-        // FIX SCROLL JUMP: Cập nhật UI cục bộ
+        // FIX LỖI MOBILE FOCUS: Giữ nguyên updateAssignmentQuestionUI, sửa lại hàm này:
         window.selectAnswer = (qIdx, oIdx) => { 
             state.ui.assignmentAnswers[qIdx] = oIdx; 
             
             const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
             if (assign) {
-                document.getElementById('assignment-question-content').innerHTML = renderTakeAssignmentQuestion(assign.questions[qIdx], qIdx);
-                renderIcons();
+                // Phải vẽ lại để highlight nút đã chọn
+                updateAssignmentQuestionUI(assign, qIdx);
             }
         };
         
-        window.captureInputAnswer = (qIdx, value) => { state.ui.assignmentAnswers[qIdx] = value; };
+        // --- SỬA LỖI MOBILE FOCUS: LƯU VÀO STATE KHI MẤT FOCUS (ONBLUR) ---
+        window.captureInputAnswer = (qIdx, value) => { 
+            state.ui.assignmentAnswers[qIdx] = value;
+            // KHÔNG RENDER APP
+        }; 
+        
         window.getJumbleAnswer = (qIdx) => { return state.ui.assignmentAnswers[qIdx] || []; };
         
         // FIX SCROLL JUMP: Cập nhật UI cục bộ
@@ -3959,8 +4071,8 @@
             
             const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
             if (assign) {
-                document.getElementById('assignment-question-content').innerHTML = renderTakeAssignmentQuestion(assign.questions[qIdx], qIdx);
-                renderIcons();
+                // Cần vẽ lại để cập nhật danh sách từ còn lại
+                updateAssignmentQuestionUI(assign, qIdx);
             }
         };
         
@@ -3972,8 +4084,8 @@
             
             const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
             if (assign) {
-                document.getElementById('assignment-question-content').innerHTML = renderTakeAssignmentQuestion(assign.questions[qIdx], qIdx);
-                renderIcons();
+                 // Cần vẽ lại để cập nhật danh sách từ còn lại
+                updateAssignmentQuestionUI(assign, qIdx);
             }
         };
         
@@ -3992,9 +4104,33 @@
             
             const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
             if (assign) {
-                document.getElementById('assignment-question-content').innerHTML = renderTakeAssignmentQuestion(assign.questions[qIdx], qIdx);
-                renderIcons();
+                // Cần vẽ lại để cập nhật trạng thái đã chọn trong dropdown
+                updateAssignmentQuestionUI(assign, qIdx);
             }
+        };
+
+        // MỚI: HÀM LƯU INPUT TRƯỚC KHI CHUYỂN TRANG
+        window.saveCurrentInput = () => {
+            const qIndex = state.ui.currentQuestionIndex;
+            const inputEl = document.getElementById(`input-q-${qIndex}`);
+            if (inputEl) {
+                state.ui.assignmentAnswers[qIndex] = inputEl.value;
+            }
+        };
+
+        window.saveCurrentInputAndGoToNext = () => {
+            saveCurrentInput();
+            goToNextQuestion();
+        };
+
+        window.saveCurrentInputAndGoToPrevious = () => {
+            saveCurrentInput();
+            goToPreviousQuestion();
+        };
+        
+        window.saveCurrentInputAndSubmit = () => {
+            saveCurrentInput();
+            submitAssignment();
         };
 
 

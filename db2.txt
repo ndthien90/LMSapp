@@ -1,0 +1,46 @@
+Hãy tạo một WEBSITE LMS GIÁO DỤC hoàn chỉnh, giao diện sinh động – trực quan, chạy tốt trên mọi thiết bị.
+1) TRANG ĐĂNG KÝ/ĐĂNG NHẬP  
+- Đăng ký: Họ tên, email, mật khẩu, vai trò (mặc định: Học sinh).  
+- Đăng nhập phân quyền: Admin → Admin Dashboard, Giáo viên → GV Dashboard, Học sinh → Trang học tập.  
+- Tài khoản Admin mặc định: admin@example.com – mật khẩu: 123456( Không hiển thị ở trang đăng nhập)
+2) BÀI VIẾT CHIA SẺ KIẾN THỨC  
+- Học sinh/GV được gửi bài viết (ở trạng thái Chờ duyệt).  
+- Admin duyệt/xóa/chỉnh sửa.  
+- Có mục bài viết chính thức + bài viết cộng đồng.
+3) HỆ THỐNG KIỂM TRA – XẾP HẠNG  
+- 5 cấp độ: Nhập môn, Sơ cấp, Trung cấp, Siêu cấp, Chuyên gia.  
+- Mỗi cấp 10 câu (1 điểm/câu). Đạt ≥8/10 mới qua cấp.  
+Hãy thiết lập lại hệ thống câu hỏi trong LMS với 3 dạng rõ ràng:
+1) Câu hỏi Trắc nghiệm (Multiple Choice)
+- Gồm 4 lựa chọn A, B, C, D.
+- Admin nhập: nội dung câu hỏi, 4 đáp án, đáp án đúng.
+- Khi học sinh làm bài, hệ thống hiển thị dạng A–D và tự động chấm điểm.
+2) Câu hỏi Trả lời ngắn (Short Answer)
+- Admin nhập: nội dung câu hỏi và đáp án mẫu.
+- Hệ thống so sánh câu trả lời của học sinh với đáp án mẫu để chấm điểm.
+3) Câu hỏi Bài luận ngắn (Short Essay)
+- Admin nhập: nội dung câu hỏi + bộ từ khóa quan trọng.
+- Hệ thống chấm điểm tự động dựa trên số từ khóa xuất hiện trong bài làm.
+Yêu cầu:
+- Giao diện thêm/sửa/xóa câu hỏi phải hiển thị rõ 3 dạng trên.
+- Khi tạo câu hỏi, admin phải chọn LOẠI CÂU HỎI trước.
+- Giữ đúng format trắc nghiệm mẫu:- Ghi nhận: tổng điểm, điểm từng cấp, số lần kiểm tra, cấp độ đạt.  
+- Xếp hạng TOP 3 – TOP 5 – TOP 10 theo tổng điểm + mức độ hoạt động.  
+- Huy chương: Đồng/Bạc/Vàng/Kim cương tùy cấp độ.  
+- Tự động tạo Giấy khen mỗi cấp độ hoàn thành.
+4) TRANG HỒ SƠ HỌC SINH  
+Hiển thị: xếp hạng, tổng điểm, cấp độ, huy chương, lịch sử kiểm tra, giấy khen.
+5) TRANG QUẢN TRỊ (ADMIN)  
+- Quản lý học sinh: thêm tài khoản hàng loạt từ Excel, xuất danh sách tài khoản.  
+- Quản lý câu hỏi: thêm/sửa/xóa, chọn loại câu hỏi và cấp độ.  
+- Quản lý bài viết: duyệt bài đóng góp.  
+- Quản lý xếp hạng và điểm.
+6) CHATBOT TÀI LIỆU  
+- Giáo viên tải tài liệu (PDF/DOCX/TXT hoặc text).  
+- Chatbot trả lời dựa trên đúng tài liệu đã cấp, không trả lời ngoài phạm vi.  
+- Học sinh chọn tài liệu → đặt câu hỏi → chatbot phản hồi.
+7) YÊU CẦU KỸ THUẬT  
+- Dùng html, dữ liệu lưu trên firebase
+- UI hiện đại (màu xanh – trắng), icon rõ ràng, tối ưu mobile.  
+- Cung cấp hướng dẫn chạy dự án.
+Hãy tạo mã nguồn hoàn chỉnh, rõ ràng, đầy đủ chức năng theo đúng yêu cầu trên.

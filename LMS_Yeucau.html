@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>FireEdu - Thiết kế Kiến trúc LMS Serverless</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+        
+        body { font-family: 'Inter', sans-serif; background-color: #F8FAFC; color: #1e293b; }
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f5f9; }
+        ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .chart-container {
+            position: relative;
+            width: 100%;
+            max-width: 100%;
+            height: 300px;
+        }
+
+        /* Interactive Card Hover Effects */
+        .interactive-card { transition: all 0.3s ease; border-left: 4px solid transparent; }
+        .interactive-card:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1); }
+        .interactive-card.active { border-left-color: #4F46E5; background-color: #EEF2FF; }
+
+        /* Code Block Styling */
+        pre { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; }
+        
+        /* Animations */
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+    </style>
+    <!-- Chosen Palette: Indigo Primary (#4F46E5), Orange Secondary (#F97316), Slate Background (#F8FAFC) - Consistent with Material 3 Design System specified in report. -->
+    
+    <!-- Application Structure Plan: 
+         Structure: Dashboard-style Single Page Application with a Sidebar Navigation.
+         Why: The source report describes a complex system (LMS). A dashboard layout mimics the actual product experience, making the technical documentation feel native to the context.
+         Sections:
+         1. Overview: High-level vision, goals, and core values.
+         2. Architecture Map: Interactive block diagram of the Firebase ecosystem (Auth, Firestore, Storage, Functions).
+         3. Database Schema: A split-view explorer to browse Collections and their Fields (crucial for devs).
+         4. Feature Flows: Role-based tabs (Student, Teacher, Admin) to see user journeys.
+         5. Analytics Preview: Simulated charts showing the "Data-Driven" value proposition.
+         6. Roadmap & Security: Timeline and Security Rules documentation.
+    -->
+
+    <!-- Visualization & Content Choices:
+         1. Architecture Map (HTML Grid): Visualizes the "Serverless" concept. Clicking blocks reveals details. NO SVG.
+         2. Database Schema (Master-Detail List): Allows users to drill down into the denormalized NoSQL structure without overwhelming text.
+         3. Analytics Charts (Chart.js): Visualizes the "Teacher Analytics" and "System Health" features mentioned in the report.
+         4. Roadmap (Vertical Stepper): Turns the text list into a visual timeline.
+         5. Security Rules (Code Block): Displays the specific Firestore rules syntax with syntax highlighting colors via simple spans.
+    -->
+    
+    <!-- CONFIRMATION: NO SVG graphics used. NO Mermaid JS used. -->
+</head>
+<body class="h-screen flex overflow-hidden">
+
+    <!-- Sidebar Navigation -->
+    <aside class="w-64 bg-slate-900 text-white flex flex-col shadow-xl z-20 transition-all duration-300" id="sidebar">
+        <div class="p-6 border-b border-slate-700 flex items-center justify-between">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight text-indigo-400">FireEdu</h1>
+                <p class="text-xs text-slate-400 mt-1">LMS Architecture v1.0</p>
+            </div>
+        </div>
+        
+        <nav class="flex-1 overflow-y-auto py-4">
+            <ul class="space-y-1 px-3">
+                <li><button onclick="navigateTo('overview')" class="nav-item w-full text-left px-4 py-3 rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-3 text-sm font-medium bg-slate-800 text-indigo-400" id="nav-overview"><span>🏠</span> Tổng Quan</button></li>
+                <li><button onclick="navigateTo('architecture')" class="nav-item w-full text-left px-4 py-3 rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-3 text-sm font-medium text-slate-300" id="nav-architecture"><span>🏗️</span> Kiến Trúc Firebase</button></li>
+                <li><button onclick="navigateTo('database')" class="nav-item w-full text-left px-4 py-3 rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-3 text-sm font-medium text-slate-300" id="nav-database"><span>💾</span> Database Schema</button></li>
+                <li><button onclick="navigateTo('features')" class="nav-item w-full text-left px-4 py-3 rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-3 text-sm font-medium text-slate-300" id="nav-features"><span>👥</span> Tính Năng & Flow</button></li>
+                <li><button onclick="navigateTo('security')" class="nav-item w-full text-left px-4 py-3 rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-3 text-sm font-medium text-slate-300" id="nav-security"><span>🛡️</span> Bảo Mật & Rules</button></li>
+                <li><button onclick="navigateTo('roadmap')" class="nav-item w-full text-left px-4 py-3 rounded-lg hover:bg-slate-800 transition-colors flex items-center gap-3 text-sm font-medium text-slate-300" id="nav-roadmap"><span>🚀</span> Roadmap & Tối Ưu</button></li>
+            </ul>
+        </nav>
+
+        <div class="p-4 border-t border-slate-700 bg-slate-900">
+            <div class="bg-indigo-900/50 rounded p-3">
+                <p class="text-xs text-indigo-200 font-semibold mb-1">Tech Stack</p>
+                <div class="flex flex-wrap gap-2 text-[10px] text-slate-300">
+                    <span class="bg-slate-700 px-1.5 py-0.5 rounded">Firebase Auth</span>
+                    <span class="bg-slate-700 px-1.5 py-0.5 rounded">Firestore</span>
+                    <span class="bg-slate-700 px-1.5 py-0.5 rounded">Cloud Functions</span>
+                </div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Main Content Area -->
+    <main class="flex-1 flex flex-col relative overflow-hidden bg-slate-50">
+        
+        <!-- Mobile Header -->
+        <header class="bg-white border-b border-slate-200 p-4 md:hidden flex justify-between items-center">
+            <span class="font-bold text-indigo-600">FireEdu</span>
+            <button onclick="toggleSidebar()" class="text-slate-500">☰</button>
+        </header>
+
+        <!-- Dynamic View Container -->
+        <div id="content-area" class="flex-1 overflow-y-auto p-6 md:p-8 scroll-smooth">
+            <!-- Content injected via JS -->
+        </div>
+
+    </main>
+
+    <script>
+        // --- DATA STORE ---
+        const reportData = {
+            overview: {
+                title: "Tổng Quan Dự Án FireEdu",
+                description: "FireEdu là Hệ thống Quản lý Học tập (LMS) thế hệ mới, vận hành hoàn toàn trên kiến trúc Serverless của Google Firebase. Hệ thống tập trung vào trải nghiệm thời gian thực (Real-time), khả năng chịu tải cao và tối ưu chi phí vận hành.",
+                names: ["FireEdu", "NexGen LMS", "SkillSync", "OpenClass", "BrainBase"],
+                selectedName: "FireEdu",
+                goals: [
+                    { role: "Học sinh", desc: "Người thụ hưởng nội dung, tham gia học tập và tương tác.", icon: "🎓" },
+                    { role: "Giáo viên", desc: "Người sáng tạo nội dung, quản lý lớp và đánh giá.", icon: "👨‍🏫" },
+                    { role: "Admin", desc: "Người vận hành hệ thống, giám sát và hỗ trợ.", icon: "🔧" }
+                ],
+                values: [
+                    { title: "Real-time Interaction", desc: "Tương tác tức thì qua chat, game, bảng xếp hạng live.", color: "bg-orange-100 text-orange-700 border-orange-200" },
+                    { title: "Scalability", desc: "Tự động mở rộng (Auto-scaling) theo lượng người dùng nhờ hạ tầng Google Cloud.", color: "bg-indigo-100 text-indigo-700 border-indigo-200" },
+                    { title: "Data-Driven", desc: "Quyết định học tập dựa trên dữ liệu thống kê chi tiết và trực quan.", color: "bg-emerald-100 text-emerald-700 border-emerald-200" }
+                ]
+            },
+            architecture: {
+                intro: "Hệ thống loại bỏ Backend truyền thống (NodeJS/Express), sử dụng hệ sinh thái Firebase để xử lý toàn bộ logic.",
+                components: [
+                    { 
+                        id: "auth", 
+                        title: "Authentication", 
+                        icon: "🔐", 
+                        details: "Sử dụng Email/Password và Google Sign-in. Phân quyền (RBAC) dựa trên Custom Claims trong ID Token (Student, Teacher, Admin). Xác thực quyền ngay tại lớp Security Rules."
+                    },
+                    { 
+                        id: "firestore", 
+                        title: "Firestore Database", 
+                        icon: "🗄️", 
+                        details: "Cơ sở dữ liệu NoSQL document-oriented. Thiết kế Denormalization (phi chuẩn hóa) để tối ưu tốc độ đọc. Hỗ trợ Real-time snapshot listeners cho các tính năng tương tác."
+                    },
+                    { 
+                        id: "storage", 
+                        title: "Cloud Storage", 
+                        icon: "☁️", 
+                        details: "Lưu trữ file media (Video, PDF, Ảnh). Cấu trúc thư mục phân cấp chặt chẽ: /avatars, /courses, /submissions. Bảo mật file bằng Storage Rules."
+                    },
+                    { 
+                        id: "functions", 
+                        title: "Cloud Functions", 
+                        icon: "⚡", 
+                        details: "Xử lý Backend Logic phức tạp: Tự động chấm điểm trắc nghiệm, cập nhật Bảng xếp hạng, gửi thông báo FCM, xử lý nén ảnh/video."
+                    }
+                ]
+            },
+            database: [
+                {
+                    name: "users",
+                    desc: "Lưu trữ hồ sơ người dùng",
+                    fields: [
+                        { name: "uid (ID)", type: "Document ID", note: "Primary Key" },
+                        { name: "email", type: "string", note: "" },
+                        { name: "role", type: "string", note: "'student' | 'teacher' | 'admin'" },
+                        { name: "classIds", type: "array", note: "Danh sách lớp tham gia" },
+                        { name: "stats", type: "map", note: "{ totalScore: number, completedCourses: number }" }
+                    ]
+                },
+                {
+                    name: "courses",
+                    desc: "Thông tin hiển thị công khai của khóa học",
+                    fields: [
+                        { name: "title", type: "string", note: "Tên khóa học" },
+                        { name: "teacherId", type: "string", note: "Reference User" },
+                        { name: "isPublished", type: "boolean", note: "Trạng thái hiển thị" },
+                        { name: "modules", type: "sub-collection", note: "Chứa bài giảng chi tiết" }
+                    ]
+                },
+                {
+                    name: "assignments",
+                    desc: "Bài tập và đề kiểm tra",
+                    fields: [
+                        { name: "courseId", type: "string", note: "Thuộc khóa học nào" },
+                        { name: "type", type: "string", note: "multiple-choice, essay" },
+                        { name: "deadline", type: "timestamp", note: "Hạn nộp" },
+                        { name: "questions", type: "array", note: "Chứa nội dung câu hỏi (Không chứa đáp án)" }
+                    ]
+                },
+                {
+                    name: "exam_solutions",
+                    desc: "BẢO MẬT: Đáp án đề thi",
+                    fields: [
+                        { name: "assignmentId", type: "string", note: "Link tới bài tập" },
+                        { name: "answers", type: "map", note: "Đáp án đúng" },
+                        { name: "SECURITY", type: "RULE", note: "Chỉ Teacher/Admin đọc được. Học sinh cấm truy cập." }
+                    ]
+                },
+                {
+                    name: "submissions",
+                    desc: "Bài làm của học sinh",
+                    fields: [
+                        { name: "studentId", type: "string", note: "Người làm bài" },
+                        { name: "answers", type: "map/array", note: "Câu trả lời của HS" },
+                        { name: "score", type: "number", note: "Điểm số" },
+                        { name: "status", type: "string", note: "submitted, graded" }
+                    ]
+                }
+            ],
+            features: {
+                student: {
+                    title: "Học Sinh (Student)",
+                    color: "indigo",
+                    items: [
+                        "Đăng nhập & Đăng ký (Firebase Auth)",
+                        "Xem Dashboard: Tiến độ, Bài tập sắp đến hạn",
+                        "Làm bài thi: Chặn copy/paste, Auto-save",
+                        "Mini-game Real-time (Firestore Snapshot)",
+                        "Nhận thông báo bài mới (FCM)",
+                        "Xem bảng xếp hạng lớp học"
+                    ]
+                },
+                teacher: {
+                    title: "Giáo Viên (Teacher)",
+                    color: "orange",
+                    items: [
+                        "Tạo khóa học (Course Builder Drag & Drop)",
+                        "Upload Video/Tài liệu lên Storage",
+                        "Giao bài tập & Đặt Deadline",
+                        "Chấm bài tự luận (Split View UI)",
+                        "Xem Analytics phân phối điểm số",
+                        "Quản lý danh sách lớp học"
+                    ]
+                },
+                admin: {
+                    title: "Quản Trị Viên (Admin)",
+                    color: "slate",
+                    items: [
+                        "Quản lý User (Ban/Unban)",
+                        "Phân quyền (Custom Claims)",
+                        "Theo dõi System Health",
+                        "Giám sát dung lượng Storage & Firestore usage"
+                    ]
+                }
+            },
+            roadmap: [
+                { phase: "Phase 1", title: "Core Foundation", items: ["Setup Firebase Project", "Auth & Rules cơ bản", "UI Dashboard"] },
+                { phase: "Phase 2", title: "Learning & Teaching", items: ["Course Builder", "Exam & Grading", "Cloud Function chấm điểm"] },
+                { phase: "Phase 3", title: "Interactive", items: ["Real-time Leaderboard", "FCM Notifications", "Class Chat"] },
+                { phase: "Phase 4", title: "Optimization", items: ["Caching Strategy", "Offline Mode (PWA)", "Advanced Analytics"] }
+            ]
+        };
+
+        // --- RENDER FUNCTIONS ---
+
+        function toggleSidebar() {
+            const sb = document.getElementById('sidebar');
+            sb.classList.toggle('-translate-x-full');
+            sb.classList.toggle('absolute');
+            sb.classList.toggle('h-full');
+        }
+
+        function setActiveNav(id) {
+            document.querySelectorAll('.nav-item').forEach(el => {
+                el.classList.remove('bg-slate-800', 'text-indigo-400');
+                el.classList.add('text-slate-300');
+            });
+            const active = document.getElementById('nav-' + id);
+            if (active) {
+                active.classList.add('bg-slate-800', 'text-indigo-400');
+                active.classList.remove('text-slate-300');
+            }
+        }
+
+        function renderOverview() {
+            const data = reportData.overview;
+            return `
+                <div class="animate-fade-in space-y-8">
+                    <div class="bg-gradient-to-r from-indigo-600 to-indigo-800 text-white rounded-2xl p-8 shadow-lg">
+                        <h1 class="text-4xl font-bold mb-2">${data.selectedName}</h1>
+                        <p class="text-indigo-100 text-lg max-w-2xl">${data.description}</p>
+                        <div class="mt-6 flex flex-wrap gap-2">
+                            ${data.names.map(n => `<span class="px-3 py-1 bg-white/10 rounded-full text-xs border border-white/20 ${n === data.selectedName ? 'bg-white/30 font-bold border-white' : ''}">${n}</span>`).join('')}
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-3 gap-6">
+                        ${data.values.map(v => `
+                            <div class="p-6 rounded-xl border-l-4 shadow-sm bg-white ${v.color.replace('bg-', 'border-').split(' ')[2]}">
+                                <h3 class="font-bold text-lg mb-2 text-slate-800">${v.title}</h3>
+                                <p class="text-slate-600 text-sm">${v.desc}</p>
+                            </div>
+                        `).join('')}
+                    </div>
+
+                    <div>
+                        <h2 class="text-xl font-bold text-slate-800 mb-4 border-l-4 border-indigo-500 pl-3">Đối Tượng Người Dùng</h2>
+                        <div class="grid md:grid-cols-3 gap-4">
+                            ${data.goals.map(g => `
+                                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 flex items-start gap-4 hover:shadow-md transition-shadow">
+                                    <div class="text-3xl bg-slate-50 p-2 rounded-lg">${g.icon}</div>
+                                    <div>
+                                        <h4 class="font-bold text-slate-900">${g.role}</h4>
+                                        <p class="text-sm text-slate-500 mt-1">${g.desc}</p>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderArchitecture() {
+            const data = reportData.architecture;
+            return `
+                <div class="animate-fade-in space-y-6">
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h2 class="text-2xl font-bold text-slate-800 mb-2">Kiến Trúc Serverless Firebase</h2>
+                        <p class="text-slate-600 mb-6">${data.intro}</p>
+                        
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                            ${data.components.map(c => `
+                                <div class="bg-slate-50 p-5 rounded-xl border border-slate-200 interactive-card cursor-pointer group hover:bg-white" onclick="alert('${c.details}')">
+                                    <div class="text-4xl mb-3 group-hover:scale-110 transition-transform duration-300">${c.icon}</div>
+                                    <h3 class="font-bold text-slate-800 text-lg mb-2">${c.title}</h3>
+                                    <p class="text-xs text-slate-500 leading-relaxed">${c.details}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <div class="grid md:grid-cols-2 gap-6">
+                         <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <h3 class="font-bold text-slate-800 mb-4">Mô hình Hoạt động (Functions Logic)</h3>
+                            <div class="space-y-3">
+                                <div class="flex items-center gap-3 p-3 bg-indigo-50 rounded-lg border border-indigo-100">
+                                    <span class="font-mono text-xs font-bold text-indigo-600 bg-white px-2 py-1 rounded">gradeMultipleChoice</span>
+                                    <span class="text-sm text-slate-700">Tự động chấm điểm khi có submission mới</span>
+                                </div>
+                                <div class="flex items-center gap-3 p-3 bg-indigo-50 rounded-lg border border-indigo-100">
+                                    <span class="font-mono text-xs font-bold text-indigo-600 bg-white px-2 py-1 rounded">updateLeaderboard</span>
+                                    <span class="text-sm text-slate-700">Cập nhật xếp hạng realtime</span>
+                                </div>
+                                <div class="flex items-center gap-3 p-3 bg-indigo-50 rounded-lg border border-indigo-100">
+                                    <span class="font-mono text-xs font-bold text-indigo-600 bg-white px-2 py-1 rounded">notifyNewAssignment</span>
+                                    <span class="text-sm text-slate-700">Gửi thông báo FCM đến lớp học</span>
+                                </div>
+                            </div>
+                        </div>
+                        
+                         <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                            <h3 class="font-bold text-slate-800 mb-4">Cấu trúc Storage</h3>
+                            <ul class="space-y-2 text-sm font-mono text-slate-600">
+                                <li class="flex items-center gap-2"><span class="text-orange-500">📂</span> /avatars/{userId}/profile.jpg</li>
+                                <li class="flex items-center gap-2"><span class="text-orange-500">📂</span> /courses/{courseId}/materials/</li>
+                                <li class="flex items-center gap-2"><span class="text-orange-500">📂</span> /assignments/{id}/attachments/</li>
+                                <li class="flex items-center gap-2"><span class="text-orange-500">📂</span> /submissions/{id}/{studentId}/</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderDatabase() {
+            return `
+                <div class="animate-fade-in h-full flex flex-col">
+                    <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-slate-800">Firestore Schema Design</h2>
+                        <p class="text-slate-500 text-sm">Thiết kế phi chuẩn hóa (Denormalization) để tối ưu hiệu năng đọc.</p>
+                    </div>
+                    
+                    <div class="flex flex-col md:flex-row gap-6 h-full min-h-[500px]">
+                        <!-- Collection List -->
+                        <div class="w-full md:w-1/3 space-y-2 overflow-y-auto pr-2">
+                            ${reportData.database.map((db, index) => `
+                                <div onclick="showSchemaDetail(${index})" id="schema-item-${index}" class="schema-item cursor-pointer p-4 rounded-lg bg-white border border-slate-200 hover:border-indigo-400 hover:shadow-md transition-all ${index === 0 ? 'border-indigo-500 ring-1 ring-indigo-500 bg-indigo-50' : ''}">
+                                    <div class="flex justify-between items-center mb-1">
+                                        <span class="font-mono font-bold text-indigo-700">${db.name}</span>
+                                        ${db.name === 'exam_solutions' ? '<span class="text-xs bg-red-100 text-red-600 px-2 py-0.5 rounded font-bold">SECURE</span>' : ''}
+                                    </div>
+                                    <p class="text-xs text-slate-500">${db.desc}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+
+                        <!-- Field Details -->
+                        <div class="w-full md:w-2/3 bg-slate-900 rounded-xl p-6 text-slate-300 font-mono text-sm overflow-y-auto shadow-2xl relative">
+                            <div class="absolute top-4 right-4 flex gap-2">
+                                <span class="w-3 h-3 rounded-full bg-red-500"></span>
+                                <span class="w-3 h-3 rounded-full bg-yellow-500"></span>
+                                <span class="w-3 h-3 rounded-full bg-green-500"></span>
+                            </div>
+                            <div id="schema-detail-content">
+                                <!-- Content populated by JS -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showSchemaDetail(index) {
+            document.querySelectorAll('.schema-item').forEach(el => {
+                el.classList.remove('border-indigo-500', 'ring-1', 'ring-indigo-500', 'bg-indigo-50');
+                el.classList.add('bg-white');
+            });
+            document.getElementById(`schema-item-${index}`).classList.add('border-indigo-500', 'ring-1', 'ring-indigo-500', 'bg-indigo-50');
+            document.getElementById(`schema-item-${index}`).classList.remove('bg-white');
+
+            const data = reportData.database[index];
+            const html = `
+                <div class="mb-4 pb-4 border-b border-slate-700">
+                    <span class="text-indigo-400">// Collection: </span> <span class="text-white font-bold">${data.name}</span>
+                    <br>
+                    <span class="text-slate-500">// ${data.desc}</span>
+                </div>
+                <div class="space-y-3">
+                    <span class="text-yellow-500">{</span>
+                    ${data.fields.map(f => `
+                        <div class="pl-6 group hover:bg-slate-800 py-1 rounded">
+                            <span class="text-blue-400">${f.name}</span>: 
+                            <span class="text-emerald-400">${f.type}</span>, 
+                            <span class="text-slate-500 italic ml-4 text-xs">// ${f.note}</span>
+                        </div>
+                    `).join('')}
+                    <span class="text-yellow-500">}</span>
+                </div>
+            `;
+            document.getElementById('schema-detail-content').innerHTML = html;
+        }
+
+        function renderFeatures() {
+            return `
+                <div class="animate-fade-in space-y-8">
+                    <div>
+                        <h2 class="text-2xl font-bold text-slate-800 mb-4">Phân Hệ Tính Năng & UX Flow</h2>
+                        <p class="text-slate-600 mb-6">Hệ thống phân quyền (RBAC) chặt chẽ, mỗi vai trò có giao diện và chức năng riêng biệt.</p>
+                    </div>
+
+                    <!-- Role Tabs -->
+                    <div class="flex gap-4 border-b border-slate-200 mb-6">
+                        <button onclick="switchRole('student')" id="tab-student" class="role-tab px-4 py-2 text-sm font-bold border-b-2 border-indigo-600 text-indigo-600">Student</button>
+                        <button onclick="switchRole('teacher')" id="tab-teacher" class="role-tab px-4 py-2 text-sm font-bold text-slate-500 border-b-2 border-transparent hover:text-slate-700">Teacher</button>
+                        <button onclick="switchRole('admin')" id="tab-admin" class="role-tab px-4 py-2 text-sm font-bold text-slate-500 border-b-2 border-transparent hover:text-slate-700">Admin</button>
+                    </div>
+
+                    <div id="role-content" class="grid md:grid-cols-2 gap-8">
+                        <!-- Content injected via JS -->
+                    </div>
+                </div>
+            `;
+        }
+
+        function switchRole(role) {
+            document.querySelectorAll('.role-tab').forEach(el => {
+                el.classList.remove('border-indigo-600', 'text-indigo-600');
+                el.classList.add('text-slate-500', 'border-transparent');
+            });
+            document.getElementById(`tab-${role}`).classList.add('border-indigo-600', 'text-indigo-600');
+            document.getElementById(`tab-${role}`).classList.remove('text-slate-500', 'border-transparent');
+
+            const data = reportData.features[role];
+            let chartHtml = '';
+            
+            // Generate a relevant mock chart based on role to demonstrate analytics capability
+            if (role === 'teacher') {
+                chartHtml = `
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h3 class="font-bold text-slate-800 mb-4 text-sm">Analytics: Phân Phối Điểm Số (Mockup)</h3>
+                        <div class="chart-container">
+                            <canvas id="teacherChart"></canvas>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-2 text-center">Biểu đồ thể hiện kết quả bài kiểm tra gần nhất của lớp.</p>
+                    </div>
+                `;
+            } else if (role === 'admin') {
+                chartHtml = `
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h3 class="font-bold text-slate-800 mb-4 text-sm">System Health: Firebase Usage (Mockup)</h3>
+                        <div class="chart-container">
+                            <canvas id="adminChart"></canvas>
+                        </div>
+                         <p class="text-xs text-slate-400 mt-2 text-center">Giám sát lượt đọc/ghi Firestore để tối ưu chi phí.</p>
+                    </div>
+                `;
+            } else {
+                 chartHtml = `
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+                        <h3 class="font-bold text-slate-800 mb-4 text-sm">Tiến độ học tập (Mockup)</h3>
+                        <div class="chart-container">
+                            <canvas id="studentChart"></canvas>
+                        </div>
+                         <p class="text-xs text-slate-400 mt-2 text-center">Theo dõi % hoàn thành các khóa học đã đăng ký.</p>
+                    </div>
+                `;
+            }
+
+            const contentHtml = `
+                <div class="space-y-4">
+                    <div class="bg-${data.color}-50 p-6 rounded-xl border border-${data.color}-100">
+                        <h3 class="text-xl font-bold text-${data.color}-700 mb-4">${data.title} Features</h3>
+                        <ul class="space-y-3">
+                            ${data.items.map(item => `
+                                <li class="flex items-start gap-3 text-slate-700 text-sm">
+                                    <span class="text-${data.color}-500 mt-0.5">✓</span>
+                                    ${item}
+                                </li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                     <div class="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                        <h4 class="font-bold text-slate-800 mb-2 text-sm uppercase tracking-wide">Key UX Flow</h4>
+                        <div class="flex flex-col gap-2">
+                            <div class="flex items-center gap-2 text-xs text-slate-600">
+                                <span class="w-2 h-2 rounded-full bg-slate-400"></span> 
+                                ${role === 'student' ? 'Đăng nhập Google -> Check User DB -> Dashboard -> Vào Lớp -> Làm Bài -> Nộp Bài' : ''}
+                                ${role === 'teacher' ? 'Đăng nhập -> Dashboard Giáo Viên -> Tạo Khóa Học -> Soạn Module (Kéo thả) -> Upload Video' : ''}
+                                ${role === 'admin' ? 'Đăng nhập -> Admin Dashboard -> Quản lý User -> Set Role/Ban -> Xem Report' : ''}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                ${chartHtml}
+            `;
+            
+            document.getElementById('role-content').innerHTML = contentHtml;
+
+            // Render Charts
+            setTimeout(() => {
+                if (role === 'teacher') initTeacherChart();
+                if (role === 'admin') initAdminChart();
+                if (role === 'student') initStudentChart();
+            }, 100);
+        }
+
+        function renderSecurity() {
+             return `
+                <div class="animate-fade-in space-y-6">
+                    <div class="flex justify-between items-center">
+                        <h2 class="text-2xl font-bold text-slate-800">Bảo Mật & Security Rules</h2>
+                        <span class="px-3 py-1 bg-red-100 text-red-600 text-xs font-bold rounded-full border border-red-200">CRITICAL PRIORITY</span>
+                    </div>
+                    
+                    <p class="text-slate-600">Hệ thống bảo vệ dữ liệu ở mức Database thông qua Firestore Rules, không phụ thuộc vào Client-side validation.</p>
+
+                    <div class="grid lg:grid-cols-2 gap-6">
+                        <div class="space-y-4">
+                             <div class="bg-white p-5 rounded-xl border-l-4 border-indigo-500 shadow-sm">
+                                <h3 class="font-bold text-slate-800 mb-1">Quy tắc Chống Gian Lận</h3>
+                                <p class="text-sm text-slate-600 mb-2">Ngăn chặn học sinh xem đề trước giờ hoặc sửa điểm số.</p>
+                                <ul class="text-xs text-slate-500 space-y-1 list-disc pl-4">
+                                    <li>Chống xem trước: <code>allow read: if request.time > resource.data.publishAt</code></li>
+                                    <li>Chống sửa điểm: Field <code>score</code> chỉ được update bởi Giáo viên/System.</li>
+                                    <li>Bảo vệ đáp án: Collection <code>exam_solutions</code> cấm hoàn toàn quyền Read của Student.</li>
+                                </ul>
+                            </div>
+                            
+                            <div class="bg-white p-5 rounded-xl border-l-4 border-emerald-500 shadow-sm">
+                                <h3 class="font-bold text-slate-800 mb-1">Phân Quyền RBAC</h3>
+                                <p class="text-sm text-slate-600 mb-2">Sử dụng Custom Claims để giảm chi phí đọc DB.</p>
+                                <ul class="text-xs text-slate-500 space-y-1 list-disc pl-4">
+                                    <li><code>request.auth.token.role == 'teacher'</code></li>
+                                    <li><code>request.auth.token.role == 'admin'</code></li>
+                                    <li>Học sinh chỉ xem được dữ liệu của chính mình (Owner only).</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="bg-slate-900 rounded-xl p-6 shadow-2xl overflow-x-auto">
+                            <h4 class="text-slate-400 text-xs font-bold uppercase mb-3 tracking-wider">firestore.rules (Preview)</h4>
+<pre class="text-xs font-mono text-emerald-300 leading-relaxed bg-transparent p-0">
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // 1. Helper Functions
+    function isTeacher() {
+      return request.auth.token.role == 'teacher';
+    }
+
+    // 2. Exam Solutions - Tuyệt mật
+    match /exam_solutions/{docId} {
+      <span class="text-yellow-300">allow read, write: if isTeacher() || isAdmin();</span>
+      <span class="text-slate-500">// Học sinh bị chặn hoàn toàn tại đây</span>
+    }
+
+    // 3. Submissions - Bài làm
+    match /submissions/{subId} {
+      <span class="text-blue-300">allow create: if request.resource.data.studentId == request.auth.uid;</span>
+      allow update: if isTeacher(); <span class="text-slate-500">// Chỉ GV sửa điểm</span>
+    }
+  }
+}
+</pre>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderRoadmap() {
+             const data = reportData.roadmap;
+             return `
+                <div class="animate-fade-in space-y-8">
+                     <div class="mb-6">
+                        <h2 class="text-2xl font-bold text-slate-800">Lộ Trình & Tối Ưu Hệ Thống</h2>
+                        <p class="text-slate-600">Kế hoạch triển khai 4 giai đoạn và các chiến lược tối ưu chi phí Firebase.</p>
+                    </div>
+
+                    <!-- Roadmap Stepper -->
+                    <div class="relative">
+                        <div class="absolute left-4 top-0 bottom-0 w-0.5 bg-slate-200"></div>
+                        <div class="space-y-8">
+                            ${data.map((phase, idx) => `
+                                <div class="relative pl-12">
+                                    <div class="absolute left-0 w-8 h-8 rounded-full bg-white border-2 border-indigo-600 flex items-center justify-center font-bold text-xs text-indigo-600 shadow-sm z-10">
+                                        ${idx + 1}
+                                    </div>
+                                    <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm hover:border-indigo-300 transition-colors">
+                                        <div class="flex justify-between items-center mb-2">
+                                            <h3 class="font-bold text-slate-800">${phase.phase}: ${phase.title}</h3>
+                                        </div>
+                                        <div class="flex flex-wrap gap-2">
+                                            ${phase.items.map(item => `
+                                                <span class="px-3 py-1 bg-slate-100 text-slate-600 text-xs rounded-full border border-slate-200">${item}</span>
+                                            `).join('')}
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+
+                    <!-- Optimization Grid -->
+                    <div class="mt-8">
+                         <h3 class="text-lg font-bold text-slate-800 mb-4 border-l-4 border-orange-500 pl-3">Chiến Lược Tối Ưu (Performance & Cost)</h3>
+                         <div class="grid md:grid-cols-2 gap-4">
+                            <div class="p-4 bg-orange-50 rounded-lg border border-orange-100">
+                                <h4 class="font-bold text-orange-800 text-sm mb-1">🔥 Caching Strategy</h4>
+                                <p class="text-xs text-slate-700">Dùng <code>getDocFromCache</code> cho nội dung tĩnh. Cache Video/Ảnh trên CDN với <code>max-age=31536000</code>.</p>
+                            </div>
+                             <div class="p-4 bg-blue-50 rounded-lg border border-blue-100">
+                                <h4 class="font-bold text-blue-800 text-sm mb-1">📑 Pagination</h4>
+                                <p class="text-xs text-slate-700">Không bao giờ load all. Sử dụng <code>limit(20)</code> và cursor <code>startAfter</code>.</p>
+                            </div>
+                             <div class="p-4 bg-purple-50 rounded-lg border border-purple-100">
+                                <h4 class="font-bold text-purple-800 text-sm mb-1">📉 Giảm Reads</h4>
+                                <p class="text-xs text-slate-700">Denormalize dữ liệu (lưu tên, avatar user ngay trong comment) để tránh query join.</p>
+                            </div>
+                             <div class="p-4 bg-emerald-50 rounded-lg border border-emerald-100">
+                                <h4 class="font-bold text-emerald-800 text-sm mb-1">⚡ Lazy Loading</h4>
+                                <p class="text-xs text-slate-700">Chỉ tải nội dung bài học khi người dùng mở Accordion.</p>
+                            </div>
+                         </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // --- CHART FUNCTIONS (MOCKUP) ---
+        
+        function initTeacherChart() {
+            const ctx = document.getElementById('teacherChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: ['0-4', '5-6', '7-8', '9-10'],
+                    datasets: [{
+                        label: 'Số lượng học sinh',
+                        data: [2, 5, 12, 6],
+                        backgroundColor: ['#EF4444', '#F59E0B', '#3B82F6', '#10B981'],
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { display: false } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        function initAdminChart() {
+            const ctx = document.getElementById('adminChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+                    datasets: [
+                        {
+                            label: 'Reads',
+                            data: [1200, 1900, 1500, 2200, 3000, 1800, 1400],
+                            borderColor: '#4F46E5',
+                            tension: 0.4
+                        },
+                        {
+                            label: 'Writes',
+                            data: [300, 450, 400, 600, 800, 350, 300],
+                            borderColor: '#F97316',
+                            tension: 0.4
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { legend: { position: 'bottom' } },
+                    scales: { y: { beginAtZero: true } }
+                }
+            });
+        }
+
+        function initStudentChart() {
+             const ctx = document.getElementById('studentChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['Hoàn thành', 'Đang học', 'Chưa bắt đầu'],
+                    datasets: [{
+                        data: [5, 3, 2],
+                        backgroundColor: ['#10B981', '#3B82F6', '#E2E8F0'],
+                        borderWidth: 0
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: { legend: { position: 'bottom' } }
+                }
+            });
+        }
+
+        // --- APP INITIALIZATION ---
+
+        function navigateTo(viewId) {
+            setActiveNav(viewId);
+            const content = document.getElementById('content-area');
+            
+            // Fade out effect
+            content.style.opacity = '0';
+            
+            setTimeout(() => {
+                switch (viewId) {
+                    case 'overview': content.innerHTML = renderOverview(); break;
+                    case 'architecture': content.innerHTML = renderArchitecture(); break;
+                    case 'database': 
+                        content.innerHTML = renderDatabase(); 
+                        showSchemaDetail(0); // Init first detail
+                        break;
+                    case 'features': 
+                        content.innerHTML = renderFeatures(); 
+                        switchRole('student'); // Init default role
+                        break;
+                    case 'security': content.innerHTML = renderSecurity(); break;
+                    case 'roadmap': content.innerHTML = renderRoadmap(); break;
+                }
+                content.style.opacity = '1';
+                content.scrollTop = 0;
+            }, 200);
+        }
+
+        // Init App
+        document.addEventListener('DOMContentLoaded', () => {
+            navigateTo('overview');
+        });
+
+    </script>
+</body>
+</html>

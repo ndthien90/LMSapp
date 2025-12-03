@@ -1,0 +1,195 @@
+Bạn là chuyên gia UX/UI, kỹ sư phần mềm, kiến trúc sư hệ thống, chuyên gia Firebase và chuyên gia giáo dục.
+
+Nhiệm vụ:
+Hãy thiết kế một ứng dụng LMS giáo dục chuyên nghiệp, đầy đủ tính năng, chạy đa nền tảng (Web/App), không sử dụng backend riêng, toàn bộ lưu trữ – xác thực – xử lý dữ liệu sử dụng Firebase (Authentication, Firestore, Storage, Cloud Functions, FCM).
+
+Hãy tạo bản phân tích SIÊU CHI TIẾT bao gồm:
+
+1. Tổng Quan Sản Phẩm
+
+Tên app (gợi ý 5 lựa chọn).
+
+Mô tả mục tiêu sản phẩm.
+
+Đối tượng người dùng (học sinh – giáo viên – admin).
+
+Giá trị cốt lõi.
+
+2. Danh Sách Tính Năng ĐẦY ĐỦ
+
+Chia thành 3 nhóm người dùng:
+
+2.1. Học sinh
+
+Đăng nhập/đăng ký bằng Firebase Auth.
+
+Xem khoá học, bài giảng, video.
+
+Làm bài tập: trắc nghiệm, điền từ, tự luận.
+
+Tự động chấm điểm.
+
+Nộp bài bằng text hoặc upload ảnh.
+
+Xếp hạng theo lớp/trường.
+
+Mini-game trả lời nhanh (real-time).
+
+Xem tiến độ học tập.
+
+Nhận huy hiệu, thành tích.
+
+Nhận thông báo đẩy FCM.
+
+2.2. Giáo viên
+
+Tạo khoá học và bài giảng.
+
+Upload video, PDF, tài liệu.
+
+Tạo bài tập đa dạng.
+
+Ngân hàng câu hỏi.
+
+Giao bài – đặt deadline.
+
+Xem thống kê tiến độ học sinh.
+
+Chấm bài tự luận.
+
+Tạo lớp học bằng mã mời.
+
+Gửi thông báo đến lớp.
+
+2.3. Admin
+
+Quản lý user, phân quyền.
+
+Quản lý lớp/môn.
+
+Theo dõi log, giám sát dung lượng.
+
+Khoá/mở tài khoản.
+
+3. Kiến Trúc Kỹ Thuật Dựa Trên Firebase
+
+Hãy thiết kế chi tiết:
+
+3.1. Firebase Authentication
+
+Email/password
+
+Google Sign-in
+
+Gán vai trò bằng Custom Claims hoặc Firestore Rules
+
+3.2. Firestore Database
+
+Hãy tạo:
+
+Sơ đồ database
+
+Danh sách collection quan trọng
+
+Cấu trúc từng document
+
+Mối liên hệ giữa các collections
+
+Quy ước đặt tên
+
+Index cần thiết
+
+Quy tắc Rule bảo mật cho từng collection
+
+3.3. Firebase Storage
+
+Thiết kế folder:
+
+/videos
+
+/courses
+
+/assignments
+
+/submissions
+
+/avatars
+
+3.4. Cloud Functions
+
+Liệt kê các hàm cần có:
+
+Tự động chấm bài trắc nghiệm
+
+Tính điểm và cập nhật bảng xếp hạng
+
+Gửi thông báo FCM
+
+Kiểm tra dữ liệu nộp bài
+
+Xử lý upload ảnh bài làm
+
+3.5. Firebase Cloud Messaging
+
+Quy trình gửi thông báo
+
+Luồng subscribe theo lớp học + theo khóa học
+
+4. Thiết Kế UI/UX
+
+Hãy tạo:
+
+Wireframe chi tiết từng màn hình
+
+Flow người dùng (học sinh / giáo viên / admin)
+
+Quy tắc màu sắc
+
+Hệ thống icon
+
+Component library
+
+Gợi ý layout theo chuẩn Material 3
+
+5. Tính Năng Nổi Bật
+
+Hãy mô tả chi tiết cách triển khai:
+
+Bảng xếp hạng realtime
+
+Mini-game thi đấu realtime bằng Firestore snapshot listeners
+
+Bộ lọc – tìm kiếm bài giảng
+
+Chế độ học offline
+
+Đồng bộ 2 chiều giữa local cache và Firestore
+
+6. Tối Ưu Hiệu Năng
+
+Hãy đề xuất:
+
+Chiến lược phân trang
+
+Cache Firestore
+
+CDN video Storage
+
+Lazy loading
+
+Quy tắc giảm chi phí Firebase
+
+7. Bảo Mật
+
+Tạo:
+
+Firestore Security Rules chi tiết
+
+Storage Rules
+
+Quy trình chống xem bài trước hạn
+
+Bảo vệ file đáp án
+
+Quy trình phân quyền mạnh (admin/teacher/student)
+

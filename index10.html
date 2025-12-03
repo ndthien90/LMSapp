@@ -4,7 +4,9 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EduBattle - Nền tảng học tập & Thi đấu</title>
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         /* Custom scrollbar for better look */
@@ -37,57 +39,21 @@
             50% { background-color: #34d399; } /* Tailwind green-400 */
             100% { background-color: #f0fff4; }
         }
-
-        /* ------------------------------------------------ */
-        /* RESPONSIVE LAYOUT STYLES - Mobile First */
-        /* ------------------------------------------------ */
-
-        /* 1. Mobile Sidebar (Off-canvas) */
-        .sidebar-transition {
-            transition: transform 0.3s ease-out;
-            transform: translateX(-100%); /* Start hidden on mobile */
-        }
-        /* Make sidebar visible on desktop (md breakpoint and up) */
-        @media (min-width: 768px) {
-            .sidebar-transition {
-                transform: translateX(0);
-            }
-        }
-        /* Class to show sidebar on mobile when toggled */
-        .sidebar-open {
-            transform: translateX(0);
-            box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
-        }
-
-        /* 2. Main Content push for mobile */
-        .main-content-wrapper {
-            transition: margin-left 0.3s ease-out;
-        }
-        /* On desktop, main content shifts right for the sidebar */
-        @media (min-width: 768px) {
-            .main-content-wrapper {
-                margin-left: 16rem; /* 64 (w-64) */
-            }
-        }
     </style>
 </head>
 <body class="bg-slate-50 text-slate-900 font-sans h-screen overflow-hidden">
 
+    <!-- App Root -->
     <div id="app" class="h-full w-full"></div>
-    <!-- Mobile Menu Overlay -->
-    <div id="menu-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden md:hidden" onclick="toggleMobileSidebar(false)"></div>
 
-
+    <!-- Toast Container -->
     <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
-    
-    <div id="avatar-modal-container"></div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithCustomToken, onAuthStateChanged, signOut, signInAnonymously,
                  createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, addDoc, updateDoc, onSnapshot, serverTimestamp, query, where, getDocs, deleteDoc, runTransaction, arrayRemove, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js"; // THÊM FIREBASE STORAGE
 
         // --- 1. CONFIGURATION ---
         let appId, firebaseConfig;
@@ -114,7 +80,6 @@
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        const storage = getStorage(app); // KHỞI TẠO STORAGE
         
         // Helper Paths
         const getPath = (col) => `artifacts/${appId}/public/data/${col}`;
@@ -156,26 +121,11 @@
                 isCreatingClass: false, 
                 isManagingStudent: false, 
                 isProcessingStudentCreation: false,
-                viewClassMode: 'students', 
-                isImportingBankData: false,
-                importQType: 'vocab_mcq', 
-                // MỚI: Trạng thái Modal Avatar
-                isAvatarModalOpen: false,
-                tempAvatarUrl: null, // Lưu trữ tạm thời URL ảnh tải lên hoặc emoji
-                tempAvatarType: null, // 'emoji' hoặc 'url'
-                // MỚI: Trạng thái Mobile Sidebar
-                isMobileSidebarOpen: false,
+                viewClassMode: 'students', // MỚI: 'students', 'assignments', 'stats'
             },
             isAuthReady: false,
-            initialAuthToken: typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null,
-            areAssignmentsListenersActive: false 
+            initialAuthToken: typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null
         };
-        
-        // MỚI: DANH SÁCH EMOJI
-        const EMOJI_AVATARS = ['🐼','🙎‍♂️','🌋','💂','🙍','🦸','🐯','🐘','🐢','🐝', '🎅', '🧙', '🐶', '🐮', '🐰', 
-                                                         '🐋', '🐵', '☃️', '🦋', '🤹‍♂️', '🐓', '🐬', '🐷', '🌎', '🎯','🎓', '😺', '🚀', '💡',
-                                                        '🕵️', '🧠', '🦉', '🦊', '🐻', '🐼', '💻', '🧑‍🎓', '👨‍🏫', '🏆', '🥇', '🥈', '🥉',
-                                                        '🐲', '🦄', '🤖'];
 
         // Hàm tạo mã phòng ngẫu nhiên 6 ký tự
         const generateRoomCode = () => {
@@ -208,7 +158,7 @@
         const shuffleArray = (array) => {
             for (let i = array.length - 1; i > 0; i--) {
                 const j = Math.floor(Math.random() * (i + 1));
-                [array[i], array[j]] = [array[i], array[j]];
+                [array[i], array[j]] = [array[j], array[i]];
             }
             return array;
         };
@@ -231,7 +181,7 @@
             }
         };
 
-        // LOAD DATA FROM LOCAL FILE (Không thay đổi)
+        // LOAD DATA FROM LOCAL FILE
         const loadVocabulary = async () => {
             try {
                 const response = await fetch('dataLMS/data.txt');
@@ -278,7 +228,7 @@
             }
         };
 
-        // --- 4. LOGIC TẠO CÂU HỎI ĐẤU TRƯỜNG MỚI (Giữ nguyên) ---
+        // --- 4. LOGIC TẠO CÂU HỎI ĐẤU TRƯỜNG MỚI (Giữ nguyên logic tạo câu hỏi Đấu trường) ---
         const generateArenaQuestions = () => {
             const vocabList = state.data.vocabulary;
             const questions = [];
@@ -376,38 +326,8 @@
             }
             return questions;
         };
-        
-        // MỚI: HÀM RENDER AVATAR (Đã sửa lỗi hiển thị preview)
-        const renderAvatar = (userProfile, size = 'w-10 h-10', textSize = 'text-base') => {
-            // Xác định xem có phải profile tạm thời (modal) hay không
-            const isTempProfile = userProfile === state.profile && state.ui.isAvatarModalOpen;
-            const profileToRender = isTempProfile ? {
-                avatarUrl: state.ui.tempAvatarUrl || state.profile?.avatarUrl,
-                avatarType: state.ui.tempAvatarType || state.profile?.avatarType,
-                name: state.profile?.name,
-                role: state.profile?.role
-            } : userProfile;
-            
-            if (profileToRender?.avatarUrl && profileToRender.avatarType === 'url') {
-                // Ảnh tải lên
-                return `<img src="${profileToRender.avatarUrl}" alt="${profileToRender.name?.charAt(0) || '?'}" class="${size} rounded-full object-cover border-2 border-white shadow-md">`;
-            } else if (profileToRender?.avatarUrl && profileToRender.avatarType === 'emoji') {
-                 // Emoji
-                return `<div class="${size} rounded-full flex items-center justify-center bg-white border border-slate-200 shadow-inner">
-                            <span class="${textSize}">${profileToRender.avatarUrl}</span>
-                        </div>`;
-            } else {
-                // Default (Chữ cái đầu tên)
-                const bgColor = profileToRender?.role === 'teacher' ? 'bg-purple-500' : 'bg-blue-500';
-                const initials = profileToRender?.name?.charAt(0) || '?';
-                return `<div class="${size} rounded-full flex items-center justify-center font-bold text-white ${bgColor} border-2 border-white shadow-md">
-                            <span class="${textSize}">${initials}</span>
-                        </div>`;
-            }
-        };
 
-
-        // --- 5. SETUP LISTENERS & AUTH (Giữ nguyên) ---
+        // --- 5. SETUP LISTENERS & AUTH ---
 
         const initAuth = async () => {
             await loadVocabulary();
@@ -416,11 +336,21 @@
             }
         };
 
-        // Hàm khởi tạo các listeners phụ thuộc vào state.profile.classIds
-        const initializeStudentDataListeners = (uid) => {
-            if (state.areAssignmentsListenersActive) return;
-
-            // 1. Assignments Listener
+        const setupListeners = (uid) => {
+            // Profile
+            onSnapshot(doc(db, getPath('users'), uid), (snap) => {
+                if(snap.exists()) {
+                    state.profile = snap.data();
+                    if (!state.ui.isProcessingStudentCreation) {
+                         renderApp();
+                    }
+                } else if (state.user) {
+                    state.profile = null;
+                    renderApp();
+                }
+            });
+            
+            // Assignments
             onSnapshot(getRef('assignments'), (snap) => {
                 const myClassIds = state.profile?.classIds || [];
                 const isTeacher = state.profile?.role === 'teacher';
@@ -442,52 +372,25 @@
                 if(state.view === 'assignments' || state.view === 'dashboard' || state.ui.viewAssignmentId || (state.ui.viewClassId && state.ui.viewClassMode !== 'students')) renderApp();
             });
             
-            // 2. Submissions Listener
+            // Submissions
             onSnapshot(getRef('submissions'), (snap) => {
                 state.data.submissions = snap.docs.map(d => ({id: d.id, ...d.data()}));
                 if(state.view === 'assignments' || state.view === 'dashboard' || state.ui.viewSubmission || (state.ui.viewClassId && state.ui.viewClassMode === 'stats')) renderApp();
             });
-
-            state.areAssignmentsListenersActive = true;
-        }
-
-        const setupListeners = (uid) => {
-            // Biến để theo dõi xem profile đã được load lần đầu chưa
-            let isProfileLoaded = false; 
-
-            // 1. Profile Listener (QUAN TRỌNG: Phải chạy trước để lấy classIds)
-            onSnapshot(doc(db, getPath('users'), uid), (snap) => {
-                if(snap.exists()) {
-                    state.profile = snap.data();
-                    if (!state.ui.isProcessingStudentCreation) {
-                         renderApp();
-                    }
-                    
-                    // Chỉ khởi tạo các listeners phụ thuộc khi profile được tải lần đầu hoặc thay đổi
-                    if (!isProfileLoaded && state.profile) {
-                        isProfileLoaded = true;
-                        initializeStudentDataListeners(uid);
-                    }
-
-                } else if (state.user) {
-                    state.profile = null;
-                    renderApp();
-                }
-            });
             
-            // 2. Users (Rank, Students list)
+            // Users (Rank, Students list)
             onSnapshot(getRef('users'), (snap) => {
                 state.data.users = snap.docs.map(d => ({id: d.id, ...d.data()}));
                 if(!state.ui.isProcessingStudentCreation && (state.view === 'ranking' || state.ui.viewClassId)) renderApp();
             });
             
-            // 3. Question Banks
+            // Question Banks
             onSnapshot(getRef('question_banks'), (snap) => {
                 state.data.questionBanks = snap.docs.map(d => ({id: d.id, ...d.data()}));
                 if(state.view === 'question_bank') renderApp();
             });
             
-            // 4. Classes (Cập nhật classIds cho học sinh)
+            // Classes
             onSnapshot(getRef('classes'), (snap) => {
                  const myClasses = snap.docs.map(d => ({id: d.id, ...d.data()}))
                  
@@ -498,10 +401,7 @@
                      const studentClassIds = studentClasses.map(c => c.id);
                      
                      if (state.profile) {
-                         // Cập nhật classIds trong profile. Sự kiện này sẽ kích hoạt Profile Listener chạy lại.
-                         state.profile.classIds = studentClassIds; 
-                         // Kích hoạt renderApp() nếu đang ở chế độ xem lớp (hoặc Assignments nếu cần)
-                         // Tuy nhiên, việc này sẽ được xử lý bởi Profile Listener.
+                         state.profile.classIds = studentClassIds;
                      }
                      state.data.classes = studentClasses;
                  } else {
@@ -511,7 +411,7 @@
                  if(state.view === 'classes' || state.ui.viewClassId) renderApp();
             });
             
-            // 5. Match Listener (Giữ nguyên)
+            // --- OPTIMIZED MATCH LISTENER ---
             onSnapshot(getRef('matches'), (snap) => {
                 state.data.matches = snap.docs.map(d => ({id: d.id, ...d.data()}));
                 const uid = state.user?.uid;
@@ -597,32 +497,10 @@
                 }
             });
         };
-        
-        // --- Smart UI Update (Cho lỗi Scroll Jump) ---
-        const updateMainContent = () => {
-            const mainEl = document.querySelector('main');
-            if (mainEl) {
-                mainEl.innerHTML = renderViewContent();
-                renderIcons();
-            }
-            
-            // RENDER MODAL NHẬP DỮ LIỆU
-            const appEl = document.getElementById('app');
-            // Cần xóa modal import data cũ trước khi render lại
-            const existingImportModal = document.querySelector('.fixed.inset-0.bg-slate-900.bg-opacity-70:not(#avatar-modal-container > div)');
-            if (existingImportModal) existingImportModal.remove();
 
-            if (state.ui.isImportingBankData) {
-                 appEl.insertAdjacentHTML('beforeend', renderImportDataModal());
-                 renderIcons();
-            }
-        }
-        
         const renderApp = () => {
             const appEl = document.getElementById('app');
-            const modalEl = document.getElementById('avatar-modal-container');
-            const overlayEl = document.getElementById('menu-overlay');
-
+            
             if (state.ui.isProcessingStudentCreation) {
                  appEl.innerHTML = `
                     <div class="fixed inset-0 bg-slate-900 bg-opacity-90 flex flex-col items-center justify-center z-50 text-white fade-in">
@@ -631,52 +509,17 @@
                         <p class="text-sm text-slate-400 mt-2">Vui lòng chờ giây lát</p>
                     </div>
                 `;
-                // Đảm bảo modal avatar được ẩn khi đang xử lý
-                modalEl.innerHTML = '';
-                overlayEl.classList.add('hidden');
                 return;
             }
 
             if (!state.isAuthReady || !state.user || !state.profile) {
                 appEl.innerHTML = renderAuthScreen();
-                // Đảm bảo modal avatar được ẩn khi ở màn hình đăng nhập
-                modalEl.innerHTML = '';
-                overlayEl.classList.add('hidden');
             } else {
-                // Giữ lại layout chính (Sidebar + Header) nếu đã tồn tại
-                if (!document.getElementById('main-layout-wrapper')) {
-                    appEl.innerHTML = renderMainLayout();
-                }
-                
-                // Cập nhật trạng thái sidebar mobile
-                const sidebarEl = document.getElementById('sidebar');
-                if (sidebarEl) {
-                    sidebarEl.classList.toggle('sidebar-open', state.ui.isMobileSidebarOpen);
-                }
-                
-                if (overlayEl) {
-                    overlayEl.classList.toggle('hidden', !state.ui.isMobileSidebarOpen);
-                }
-
-                // Chỉ cập nhật nội dung của MAIN (và modal import data nếu có)
-                updateMainContent();
+                appEl.innerHTML = renderMainLayout();
             }
-            
-            // **FIX QUAN TRỌNG:** Phải render Avatar Modal vào container riêng (Đúng vị trí)
-            if (state.ui.isAvatarModalOpen) {
-                modalEl.innerHTML = renderAvatarModal();
-                renderIcons();
-            } else {
-                modalEl.innerHTML = '';
-            }
+            renderIcons();
         };
         
-        // MỚI: Toggle Mobile Sidebar
-        window.toggleMobileSidebar = (val) => {
-            state.ui.isMobileSidebarOpen = val;
-            renderApp();
-        };
-
         // --- 6. RENDERERS ---
 
         const renderAuthScreen = () => {
@@ -685,23 +528,23 @@
             
             return `
                 <div class="min-h-screen bg-slate-900 flex items-center justify-center p-4">
-                    <div class="bg-white rounded-2xl shadow-2xl p-6 sm:p-8 w-full max-w-sm sm:max-w-md fade-in">
-                        <div class="text-center mb-6 sm:mb-8">
-                            <div class="bg-blue-600 w-12 h-12 sm:w-16 sm:h-16 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                                <i data-lucide="book-open" class="text-white w-6 h-6 sm:w-8 sm:h-8"></i>
+                    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md fade-in">
+                        <div class="text-center mb-8">
+                            <div class="bg-blue-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                                <i data-lucide="book-open" class="text-white w-8 h-8"></i>
                             </div>
-                            <h1 class="text-2xl sm:text-3xl font-bold text-slate-800">EduBattle</h1>
-                            <p class="text-sm text-slate-500">Nền tảng học tập & thi đấu</p>
+                            <h1 class="text-3xl font-bold text-slate-800">EduBattle</h1>
+                            <p class="text-slate-500">Nền tảng học tập & thi đấu</p>
                         </div>
-                        <h2 class="text-xl sm:text-2xl font-bold text-slate-800 mb-5 text-center">${isRegister ? 'Đăng ký tài khoản mới' : 'Đăng nhập'}</h2>
-                        <form onsubmit="${isRegister ? 'handleRegister(event)' : 'handleLogin(event)'}" class="space-y-3 sm:space-y-4">
+                        <h2 class="text-2xl font-bold text-slate-800 mb-6 text-center">${isRegister ? 'Đăng ký tài khoản mới' : 'Đăng nhập'}</h2>
+                        <form onsubmit="${isRegister ? 'handleRegister(event)' : 'handleLogin(event)'}" class="space-y-4">
                             ${isRegister ? `
                                 <div><input id="join-name" type="text" required class="w-full p-3 border rounded-lg" placeholder="Họ và tên"></div>
                                 <div><input id="join-email" type="email" required class="w-full p-3 border rounded-lg" placeholder="Email"></div>
                                 <div><input id="join-password" type="password" required class="w-full p-3 border rounded-lg" placeholder="Mật khẩu"></div>
-                                <div class="grid grid-cols-2 gap-3 sm:gap-4">
-                                    <label class="cursor-pointer border p-2 rounded-lg text-center text-sm sm:text-base"><input type="radio" name="role" value="student" ${currentRole === 'student' ? 'checked' : ''} onchange="renderApp()"> Học sinh</label>
-                                    <label class="cursor-pointer border p-2 rounded-lg text-center text-sm sm:text-base"><input type="radio" name="role" value="teacher" ${currentRole === 'teacher' ? 'checked' : ''} onchange="renderApp()"> Giáo viên</label>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <label class="cursor-pointer border p-2 rounded text-center"><input type="radio" name="role" value="student" ${currentRole === 'student' ? 'checked' : ''} onchange="renderApp()"> Học sinh</label>
+                                    <label class="cursor-pointer border p-2 rounded text-center"><input type="radio" name="role" value="teacher" ${currentRole === 'teacher' ? 'checked' : ''} onchange="renderApp()"> Giáo viên</label>
                                 </div>
                                 
                                 ${currentRole === 'teacher' ? 
@@ -715,7 +558,7 @@
                                 <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold shadow-lg">Đăng nhập</button>
                             `}
                         </form>
-                        <div class="mt-4 pt-3 border-t text-center text-sm">
+                        <div class="mt-6 pt-4 border-t text-center text-sm">
                             <button onclick="setAuthMode('${isRegister ? 'login' : 'register'}')" class="font-bold text-blue-600 hover:text-blue-700 transition">
                                 ${isRegister ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký ngay'}
                             </button>
@@ -726,18 +569,14 @@
         };
 
         const renderMainLayout = () => `
-            <div id="main-layout-wrapper" class="h-screen bg-slate-50 overflow-hidden relative">
-                <!-- Sidebar (Fixed position on mobile, always visible on desktop) -->
-                <div id="sidebar" class="fixed top-0 left-0 h-full w-64 bg-slate-900 text-slate-300 flex flex-col shadow-xl z-50 sidebar-transition md:relative md:translate-x-0 md:flex-shrink-0 md:w-64">
+            <div class="flex h-screen bg-slate-50 overflow-hidden">
+                <!-- Sidebar -->
+                <div class="w-64 bg-slate-900 text-slate-300 flex flex-col shadow-xl flex-shrink-0">
                     <div class="p-6 border-b border-slate-800 flex items-center gap-3">
                         <div class="bg-blue-600 p-2 rounded-lg"><i data-lucide="book-open" class="text-white w-5 h-5"></i></div>
                         <h1 class="text-xl font-bold text-white">EduBattle</h1>
-                        <!-- Close button for mobile -->
-                        <button onclick="toggleMobileSidebar(false)" class="md:hidden ml-auto text-slate-400 hover:text-white">
-                            <i data-lucide="x" size="24"></i>
-                        </button>
                     </div>
-                    <nav class="flex-1 p-4 space-y-2 overflow-y-auto">
+                    <nav class="flex-1 p-4 space-y-2">
                         ${renderNavItem('dashboard', 'layout-dashboard', 'Tổng quan')}
                         ${state.profile.role === 'teacher' ? renderNavItem('classes', 'graduation-cap', 'Quản lý Lớp học') : ''}
                         ${renderNavItem('assignments', 'book-open', 'Bài tập')}
@@ -746,13 +585,14 @@
                         ${renderNavItem('ranking', 'trophy', 'Xếp hạng')}
                     </nav>
                     <div class="p-4 border-t border-slate-800">
-                        <div class="flex items-center gap-3 mb-4 px-2 group cursor-pointer" onclick="toggleAvatarModal(true)">
-                            ${renderAvatar(state.profile, 'w-10 h-10', 'text-base')}
+                        <div class="flex items-center gap-3 mb-4 px-2">
+                            <div class="w-8 h-8 rounded-full flex items-center justify-center font-bold text-white ${state.profile.role === 'teacher' ? 'bg-purple-500' : 'bg-blue-500'}">
+                                ${state.profile.name.charAt(0)}
+                            </div>
                             <div class="overflow-hidden">
-                                <p class="text-sm font-medium text-white truncate group-hover:text-blue-400 transition">${state.profile.name}</p>
+                                <p class="text-sm font-medium text-white truncate">${state.profile.name}</p>
                                 <p class="text-xs text-slate-400 capitalize">${state.profile.role === 'teacher' ? 'Giáo viên' : 'Học sinh'}</p>
                             </div>
-                            <i data-lucide="pencil" size="16" class="text-slate-500 group-hover:text-blue-400 transition ml-auto"></i>
                         </div>
                         <button onclick="handleSignOut()" class="w-full flex items-center gap-2 px-4 py-2 text-sm text-red-400 hover:bg-slate-800 rounded-lg transition-colors">
                             <i data-lucide="log-out" size="16"></i> Đăng xuất
@@ -761,25 +601,20 @@
                 </div>
 
                 <!-- Main Content -->
-                <div class="flex flex-col min-w-0 h-full w-full md:absolute md:left-0 main-content-wrapper">
-                    <header class="bg-white shadow-md px-4 sm:px-8 py-3 sm:py-4 flex justify-between items-center z-10">
-                        <!-- Mobile Menu Button -->
-                        <button onclick="toggleMobileSidebar(true)" class="md:hidden p-2 rounded-lg text-slate-700 hover:bg-slate-100 mr-3">
-                            <i data-lucide="menu" size="24"></i>
-                        </button>
-                        
-                        <h2 class="text-xl sm:text-2xl font-bold text-slate-800 capitalize truncate">
+                <div class="flex-1 flex flex-col min-w-0">
+                    <header class="bg-white shadow-sm px-8 py-4 flex justify-between items-center z-10">
+                        <h2 class="text-2xl font-bold text-slate-800 capitalize">
                             ${state.view === 'dashboard' ? 'Tổng quan' : 
                               state.view === 'classes' ? 'Quản lý Lớp học' : 
                               state.view === 'assignments' ? 'Bài tập về nhà' :
                               state.view === 'question_bank' ? 'Ngân hàng đề' :
                               state.view === 'competition' ? 'Đấu trường trực tuyến' : 'Bảng xếp hạng'}
                         </h2>
-                        <div class="px-3 py-1 sm:px-4 sm:py-1 bg-yellow-100 text-yellow-700 rounded-full text-xs sm:text-sm font-bold flex items-center gap-1 sm:gap-2">
+                        <div class="px-4 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-bold flex items-center gap-2">
                             <i data-lucide="trophy" size="14"></i> ${state.profile.points} điểm
                         </div>
                     </header>
-                    <main class="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 fade-in">
+                    <main class="flex-1 overflow-auto p-8 fade-in">
                         ${renderViewContent()}
                     </main>
                 </div>
@@ -804,7 +639,7 @@
             }
         };
         
-        // DASHBOARD (Tối ưu hóa layout mobile)
+        // DASHBOARD
         const renderDashboard = () => {
             const mySubmissions = state.data.submissions.filter(s => s.studentId === state.user.uid);
             const myAssignments = state.data.assignments;
@@ -814,59 +649,46 @@
             ).length;
             
             return `
-                <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6 sm:mb-8">
-                    <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3 sm:gap-4">
-                        <div class="p-3 sm:p-4 rounded-xl bg-yellow-50 text-yellow-500"><i data-lucide="trophy"></i></div>
-                        <div><p class="text-slate-500 text-xs sm:text-sm">Điểm tích lũy</p><p class="text-xl sm:text-2xl font-bold text-slate-800">${state.profile.points}</p></div>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                        <div class="p-4 rounded-xl bg-yellow-50 text-yellow-500"><i data-lucide="trophy"></i></div>
+                        <div><p class="text-slate-500 text-sm">Điểm tích lũy</p><p class="text-2xl font-bold text-slate-800">${state.profile.points}</p></div>
                     </div>
-                    <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3 sm:gap-4">
-                        <div class="p-3 sm:p-4 rounded-xl bg-green-50 text-green-500"><i data-lucide="check-circle"></i></div>
-                        <div><p class="text-slate-500 text-xs sm:text-sm">Bài tập đã làm</p><p class="text-xl sm:text-2xl font-bold text-slate-800">${mySubmissions.length}</p></div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                        <div class="p-4 rounded-xl bg-green-50 text-green-500"><i data-lucide="check-circle"></i></div>
+                        <div><p class="text-slate-500 text-sm">Bài tập đã làm</p><p class="text-2xl font-bold text-slate-800">${mySubmissions.length}</p></div>
                     </div>
-                    <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-3 sm:gap-4">
-                        <div class="p-3 sm:p-4 rounded-xl bg-orange-50 text-orange-500"><i data-lucide="clock"></i></div>
-                        <div><p class="text-slate-500 text-xs sm:text-sm">Bài tập chờ</p><p class="text-xl sm:text-2xl font-bold text-slate-800">${Math.max(0, pending)}</p></div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-100 flex items-center gap-4">
+                        <div class="p-4 rounded-xl bg-orange-50 text-orange-500"><i data-lucide="clock"></i></div>
+                        <div><p class="text-slate-500 text-sm">Bài tập chờ</p><p class="text-2xl font-bold text-slate-800">${Math.max(0, pending)}</p></div>
                     </div>
                 </div>
-                <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-6 sm:p-8 text-white shadow-xl flex flex-col lg:flex-row items-start lg:items-center justify-between">
+                <div class="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-2xl p-8 text-white shadow-xl flex items-center justify-between">
                     <div>
-                        <h3 class="text-xl sm:text-2xl font-bold mb-2">Chào mừng trở lại, ${state.profile.name}!</h3>
-                        <p class="text-blue-100 max-w-xl mb-4 sm:mb-6 text-sm">
+                        <h3 class="text-2xl font-bold mb-2">Chào mừng trở lại, ${state.profile.name}!</h3>
+                        <p class="text-blue-100 max-w-xl mb-6">
                             ${state.profile.role === 'student' ? 'Bạn đã sẵn sàng để chinh phục các thử thách hôm nay chưa?' : 'Quản lý lớp học và tạo bài tập mới.'}
                         </p>
-                        <div class="flex flex-wrap gap-3">
-                            <button onclick="changeView('assignments')" class="bg-white text-blue-700 px-4 py-2 sm:px-6 sm:py-2 rounded-lg font-bold hover:bg-blue-50 transition text-sm">
+                        <div class="flex gap-3">
+                            <button onclick="changeView('assignments')" class="bg-white text-blue-700 px-6 py-2 rounded-lg font-bold hover:bg-blue-50 transition">
                                 ${state.profile.role === 'student' ? 'Làm bài ngay' : 'Tạo bài tập'}
                             </button>
-                            <button onclick="changeView('competition')" class="bg-blue-800 text-white px-4 py-2 sm:px-6 sm:py-2 rounded-lg font-bold hover:bg-blue-900 transition flex items-center gap-2 text-sm">
+                            <button onclick="changeView('competition')" class="bg-blue-800 text-white px-6 py-2 rounded-lg font-bold hover:bg-blue-900 transition flex items-center gap-2">
                                 <i data-lucide="swords" size="16"></i> Đấu trường
                             </button>
                         </div>
                     </div>
-                    <i data-lucide="trophy" class="w-16 h-16 opacity-20 hidden lg:block lg:w-32 lg:h-32"></i>
+                    <i data-lucide="trophy" class="w-32 h-32 opacity-20 hidden lg:block"></i>
                 </div>
             `;
         };
 
-        // MỚI: CLASSES MANAGEMENT RENDERERS (Tối ưu hóa mobile grid)
+        // MỚI: CLASSES MANAGEMENT RENDERERS
 
         const renderClasses = () => {
             const isTeacher = state.profile.role === 'teacher';
             if (!isTeacher) return `<p class="text-red-500">Bạn không có quyền truy cập tính năng này.</p>`;
 
-            if (state.ui.viewClassId && (state.ui.isCreatingAssignment || state.ui.viewAssignmentId)) {
-                // NESTED VIEW: Nếu đang ở chế độ xem lớp nhưng lại đang tạo/sửa assignment, ưu tiên render form tạo/sửa
-                 if (state.ui.isCreatingAssignment) {
-                     if (state.ui.isSelectingBankQuestions) {
-                         return renderQuestionSelectionFromBank(); 
-                     }
-                     return renderCreateAssignmentForm();
-                 }
-                 if (state.ui.viewAssignmentId) {
-                     return renderAssignmentDetails(); 
-                 }
-            }
-            
             if (state.ui.viewClassId) {
                 return renderViewClass(state.ui.viewClassId);
             }
@@ -880,16 +702,16 @@
                 const studentCount = (c.studentIds ? c.studentIds.length : 0);
 
                 return `
-                    <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition">
-                        <div class="flex justify-between items-center mb-3">
-                            <div class="bg-green-100 p-2 rounded-lg text-green-600"><i data-lucide="graduation-cap" size="20"></i></div>
-                            <span class="text-xs font-bold text-green-600 bg-green-100 px-3 py-1 rounded-full">${c.classCode || 'N/A'}</span>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition">
+                        <div class="flex justify-between items-center mb-4">
+                            <div class="bg-green-100 p-3 rounded-lg text-green-600"><i data-lucide="graduation-cap"></i></div>
+                            <span class="text-sm font-bold text-green-600 bg-green-100 px-3 py-1 rounded-full">${c.classCode || 'N/A'}</span>
                         </div>
-                        <h4 class="text-lg font-bold text-slate-800 mb-2">${c.title}</h4>
+                        <h4 class="text-xl font-bold text-slate-800 mb-2">${c.title}</h4>
                         <p class="text-slate-500 text-sm mb-4">${studentCount} Học sinh</p>
                         <div class="flex gap-2">
-                            <button onclick="viewClass('${c.id}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition text-sm">
-                                <i data-lucide="eye" size="16" class="inline mr-1"></i> Quản lý
+                            <button onclick="viewClass('${c.id}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition">
+                                <i data-lucide="eye" size="18" class="inline mr-1"></i> Quản lý
                             </button>
                             <button onclick="confirmDeleteClass('${c.id}', '${c.title}')" class="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition">
                                 <i data-lucide="trash-2" size="18"></i>
@@ -900,10 +722,10 @@
             }).join('');
 
             return `
-                <button onclick="toggleCreateClass(true)" class="mb-6 bg-green-600 hover:bg-green-700 text-white px-4 py-3 rounded-xl font-bold shadow-md flex items-center gap-2 text-sm sm:text-base">
+                <button onclick="toggleCreateClass(true)" class="mb-6 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-xl font-bold shadow-md flex items-center gap-2">
                     <i data-lucide="plus-circle"></i> Tạo Lớp học mới
                 </button>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     ${list || '<p class="text-slate-500">Bạn chưa tạo lớp học nào.</p>'}
                 </div>
             `;
@@ -911,13 +733,13 @@
 
         const renderCreateClassForm = () => {
             return `
-                <div class="max-w-xl mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-lg">
-                    <div class="flex justify-between items-center mb-5 border-b pb-3">
-                        <h3 class="text-xl sm:text-2xl font-bold text-green-600">Tạo Lớp học mới</h3>
+                <div class="max-w-xl mx-auto bg-white p-8 rounded-2xl shadow-lg">
+                    <div class="flex justify-between items-center mb-6 border-b pb-4">
+                        <h3 class="text-2xl font-bold text-green-600">Tạo Lớp học mới</h3>
                         <button onclick="toggleCreateClass(false)" class="text-slate-500 hover:text-red-500"><i data-lucide="x"></i></button>
                     </div>
                     <label for="class-title" class="block text-sm font-medium text-slate-700 mb-1">Tên Lớp học</label>
-                    <input id="class-title" type="text" class="w-full p-3 border-2 rounded-lg text-lg mb-5 focus:border-green-500" placeholder="Ví dụ: Lớp Hán ngữ 101">
+                    <input id="class-title" type="text" class="w-full p-3 border-2 rounded-lg text-lg mb-6 focus:border-green-500" placeholder="Ví dụ: Lớp Hán ngữ 101">
                     <button onclick="handleCreateClass()" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700">Lưu Lớp học</button>
                 </div>
             `;
@@ -925,48 +747,39 @@
         
         // Helper to render student list
         const renderClassStudents = (classData, studentList) => {
-            const studentRows = studentList.map(s => {
-                const studentProfile = state.data.users.find(u => u.uid === s.uid);
-                return `
-                    <tr class="border-b last:border-0 hover:bg-slate-50 transition">
-                        <td class="py-3 pl-4 flex items-center gap-3">
-                            ${renderAvatar(studentProfile, 'w-8 h-8', 'text-sm')}
-                            <span class="font-medium text-slate-700">${s.name}</span>
-                        </td>
-                        <td class="py-3 text-sm text-slate-500 hidden sm:table-cell">${s.email}</td>
-                        <td class="py-3 text-right pr-4">
-                            <button onclick="confirmRemoveStudent('${classData.id}', '${s.uid}', '${s.name}')" 
-                                    class="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition">
-                                <i data-lucide="user-minus" size="16"></i>
-                            </button>
-                        </td>
-                    </tr>
-                `;
-            }).join('');
+            const studentRows = studentList.map(s => `
+                <tr class="border-b last:border-0 hover:bg-slate-50 transition">
+                    <td class="py-3 pl-4 font-medium text-slate-700">${s.name}</td>
+                    <td class="py-3 text-slate-500">${s.email}</td>
+                    <td class="py-3 text-right pr-4">
+                        <button onclick="confirmRemoveStudent('${classData.id}', '${s.uid}', '${s.name}')" 
+                                class="text-red-500 hover:text-red-700 p-2 rounded-full hover:bg-red-50 transition">
+                            <i data-lucide="user-minus" size="18"></i>
+                        </button>
+                    </td>
+                </tr>
+            `).join('');
             
             return `
                 <h4 class="text-xl font-bold text-slate-700 mb-4">Danh sách Học sinh</h4>
                 <div class="bg-slate-50 rounded-xl overflow-hidden shadow-inner border">
-                    <div class="overflow-x-auto">
-                        <table class="w-full min-w-[500px]">
-                            <thead>
-                                <tr class="text-left text-slate-500 text-sm border-b bg-slate-100">
-                                    <th class="pb-3 pt-3 pl-4">Họ và Tên</th>
-                                    <th class="pb-3 pt-3 hidden sm:table-cell">Tài khoản (Email)</th>
-                                    <th class="pb-3 pt-3 pr-4 text-right">Thao tác</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${studentRows || `<tr><td colspan="3" class="text-center py-8 text-slate-500">Chưa có học sinh nào trong lớp.</td></tr>`}
-                            </tbody>
-                        </table>
-                    </div>
+                    <table class="w-full">
+                        <thead>
+                            <tr class="text-left text-slate-500 text-sm border-b bg-slate-100">
+                                <th class="pb-3 pt-3 pl-4">Họ và Tên</th>
+                                <th class="pb-3 pt-3">Tài khoản (Email)</th>
+                                <th class="pb-3 pt-3 pr-4 text-right">Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            ${studentRows || `<tr><td colspan="3" class="text-center py-8 text-slate-500">Chưa có học sinh nào trong lớp.</td></tr>`}
+                        </tbody>
+                    </table>
                 </div>
             `;
         }
 
         const renderClassAssignments = (classData, studentList) => {
-            // Lọc bài tập đã giao cho lớp này VÀ được tạo bởi giáo viên hiện tại
             const classAssignments = state.data.assignments.filter(a => 
                 (a.classIds || []).includes(classData.id) && a.createdBy === state.user.uid
             );
@@ -985,19 +798,19 @@
 
 
                 return `
-                    <div class="bg-white p-4 sm:p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition">
+                    <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition">
                         <div class="flex justify-between items-start mb-3">
-                            <h4 class="text-base sm:text-lg font-bold text-slate-800">${a.title}</h4>
-                            <span class="px-3 py-1 rounded-full text-xs font-bold ${completionColor} whitespace-nowrap">
+                            <h4 class="text-lg font-bold text-slate-800">${a.title}</h4>
+                            <span class="px-3 py-1 rounded-full text-xs font-bold ${completionColor}">
                                 ${submissionsCount}/${studentList.length} nộp (${completionRate}%)
                             </span>
                         </div>
                         <p class="text-slate-500 text-sm mb-4">${a.questions.length} câu hỏi</p>
                         <div class="flex gap-2 text-sm font-medium">
-                            <button onclick="viewAssignmentDetailsInClass('${a.id}')" class="flex-1 flex items-center justify-center gap-1 bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded-lg transition text-xs sm:text-sm">
+                            <button onclick="viewAssignmentDetails('${a.id}')" class="flex-1 flex items-center justify-center gap-1 bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded-lg transition">
                                 <i data-lucide="eye" size="16"></i> Xem/Sửa
                             </button>
-                            <button onclick="confirmDeleteAssignment('${a.id}', '${a.title}')" class="flex-1 flex items-center justify-center gap-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg transition text-xs sm:text-sm">
+                            <button onclick="confirmDeleteAssignment('${a.id}', '${a.title}')" class="flex-1 flex items-center justify-center gap-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg transition">
                                 <i data-lucide="trash-2" size="16"></i> Xóa
                             </button>
                         </div>
@@ -1007,10 +820,10 @@
 
             return `
                 <h4 class="text-xl font-bold text-slate-700 mb-4">Danh sách Bài tập đã giao</h4>
-                <button onclick="createClassAssignment('${classData.id}', '${classData.title}')" class="mb-6 bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-3 rounded-xl font-bold shadow-md flex items-center gap-2 text-sm sm:text-base">
+                <button onclick="createClassAssignment('${classData.id}', '${classData.title}')" class="mb-6 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-md flex items-center gap-2">
                     <i data-lucide="plus-circle"></i> Tạo Bài tập mới cho ${classData.title}
                 </button>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     ${list || `<p class="text-slate-500">Chưa có bài tập nào được giao cho lớp này.</p>`}
                 </div>
             `;
@@ -1031,11 +844,9 @@
                 );
                 
                 const studentStats = studentList.map(student => {
-                    const userProfile = state.data.users.find(u => u.uid === sid);
                     const sub = submissions.find(s => s.studentId === student.uid);
                     return {
                         ...student,
-                        ...userProfile, // Thêm thông tin avatar
                         score: sub ? sub.score : 0,
                         submitted: !!sub
                     };
@@ -1046,39 +857,34 @@
 
                 const statsRows = studentStats.map((s, idx) => `
                     <tr class="border-b last:border-0 hover:bg-slate-50 transition ${!s.submitted ? 'opacity-60' : ''}">
-                        <td class="py-3 pl-4 font-bold text-slate-700 text-sm w-12">${idx + 1}</td>
-                        <td class="py-3 flex items-center gap-3">
-                            ${renderAvatar(s, 'w-8 h-8', 'text-sm')}
-                            <span class="font-medium text-slate-700 text-sm truncate">${s.name}</span>
-                        </td>
-                        <td class="py-3 text-center hidden sm:table-cell">
+                        <td class="py-3 pl-4 font-medium text-slate-700">${idx + 1}</td>
+                        <td class="py-3 font-medium text-slate-700">${s.name}</td>
+                        <td class="py-3 text-center">
                             <span class="px-3 py-1 rounded-full text-xs font-bold ${s.submitted ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}">
                                 ${s.submitted ? 'Đã nộp' : 'Chưa nộp'}
                             </span>
                         </td>
-                        <td class="py-3 pr-4 text-right font-bold text-base sm:text-lg ${s.score >= 50 ? 'text-green-600' : 'text-red-500'} w-20">${s.score}</td>
+                        <td class="py-3 pr-4 text-right font-bold text-lg ${s.score >= 50 ? 'text-green-600' : 'text-red-500'}">${s.score}</td>
                     </tr>
                 `).join('');
 
                 return `
-                    <div class="bg-white p-4 sm:p-6 rounded-xl shadow-md border mb-6">
-                        <h5 class="text-lg sm:text-xl font-bold text-blue-600 mb-4 border-b pb-2">${assign.title} (${assign.questions.length} câu)</h5>
+                    <div class="bg-white p-6 rounded-xl shadow-md border mb-6">
+                        <h5 class="text-xl font-bold text-blue-600 mb-4 border-b pb-2">${assign.title} (${assign.questions.length} câu)</h5>
                         <div class="bg-slate-50 rounded-xl overflow-hidden shadow-inner border">
-                            <div class="overflow-x-auto">
-                                <table class="w-full min-w-[500px]">
-                                    <thead>
-                                        <tr class="text-left text-slate-500 text-xs sm:text-sm border-b bg-slate-100">
-                                            <th class="pb-3 pt-3 pl-4 w-12">Hạng</th>
-                                            <th class="pb-3 pt-3">Học sinh</th>
-                                            <th class="pb-3 pt-3 text-center hidden sm:table-cell">Trạng thái</th>
-                                            <th class="pb-3 pt-3 pr-4 text-right w-20">Điểm (100)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${statsRows}
-                                    </tbody>
-                                </table>
-                            </div>
+                            <table class="w-full">
+                                <thead>
+                                    <tr class="text-left text-slate-500 text-sm border-b bg-slate-100">
+                                        <th class="pb-3 pt-3 pl-4 w-12">Hạng</th>
+                                        <th class="pb-3 pt-3">Học sinh</th>
+                                        <th class="pb-3 pt-3 text-center">Trạng thái</th>
+                                        <th class="pb-3 pt-3 pr-4 text-right w-20">Điểm (100)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${statsRows}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 `;
@@ -1093,11 +899,6 @@
         const renderViewClass = (classId) => {
             const classData = state.data.classes.find(c => c.id === classId);
             if (!classData) return `<p class="text-red-500">Không tìm thấy lớp học.</p>`;
-            
-            // KIỂM TRA MỚI: Nếu đang trong ngữ cảnh lớp nhưng lại đang tạo/sửa bài tập, render form đó
-            if (state.ui.isCreatingAssignment || state.ui.viewAssignmentId) {
-                // Logic này đã được chuyển lên renderClasses để đảm bảo view assignment/create form được render trước
-            }
 
             const studentList = (classData.studentIds || []).map(sid => {
                 const user = state.data.users.find(u => u.uid === sid);
@@ -1122,51 +923,52 @@
             // Tabs/Navigation
             const nav = (mode, icon, label) => `
                 <button onclick="setViewClassMode('${mode}')" 
-                    class="flex-1 flex flex-col sm:flex-row items-center justify-center gap-1 sm:gap-2 py-2 sm:py-3 rounded-xl font-bold transition text-xs sm:text-sm 
+                    class="flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold transition 
                     ${state.ui.viewClassMode === mode ? 'bg-blue-600 text-white shadow-md' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
                     <i data-lucide="${icon}" size="20"></i> ${label}
                 </button>
             `;
 
             return `
-                <div class="max-w-7xl mx-auto bg-white p-4 sm:p-8 rounded-2xl shadow-lg">
-                    <div class="flex justify-between items-start mb-5 border-b pb-3">
-                        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
+                <div class="max-w-7xl mx-auto bg-white p-8 rounded-2xl shadow-lg">
+                    <div class="flex justify-between items-center mb-6 border-b pb-4">
+                        <div class="flex items-center gap-4">
                             <input id="edit-class-title" type="text" value="${classData.title}" 
-                                    class="text-xl sm:text-3xl font-bold border-b-2 border-transparent hover:border-blue-200 focus:border-blue-500 outline-none p-1 w-full sm:w-auto">
-                            <button onclick="handleUpdateClassTitle('${classData.id}')" class="text-blue-500 hover:text-blue-700 p-1 sm:p-0">
+                                    class="text-3xl font-bold border-b-2 border-transparent hover:border-blue-200 focus:border-blue-500 outline-none p-1">
+                            <button onclick="handleUpdateClassTitle('${classData.id}')" class="text-blue-500 hover:text-blue-700">
                                 <i data-lucide="save" size="24"></i>
                             </button>
                         </div>
                         <button onclick="viewClass(null)" class="text-slate-500 hover:text-red-500"><i data-lucide="x"></i></button>
                     </div>
                     
-                    <div class="bg-green-50 text-green-800 p-4 rounded-xl mb-6 font-bold text-base sm:text-lg flex flex-col sm:flex-row justify-between items-start sm:items-center">
+                    <div class="bg-green-50 text-green-800 p-4 rounded-xl mb-6 font-bold text-lg flex justify-between items-center">
                         Mã lớp: 
-                        <span class="text-xl sm:text-2xl text-green-700 font-extrabold">${classData.classCode || 'N/A'}</span>
+                        <span class="text-2xl text-green-700">${classData.classCode || 'N/A'}</span>
                     </div>
 
-                    <div class="flex gap-2 sm:gap-4 mb-6 sm:mb-8">
-                        ${nav('students', 'users', `Học sinh (${studentList.length})`)}
+                    <!-- Navigation Tabs -->
+                    <div class="flex gap-4 mb-8">
+                        ${nav('students', 'users', `Quản lý HS (${studentList.length})`)}
                         ${nav('assignments', 'clipboard-list', 'Bài tập')}
                         ${nav('stats', 'bar-chart-3', 'Thống kê')}
                     </div>
 
+                    <!-- Dynamic Content -->
                     ${contentHtml}
                 </div>
             `;
         };
         
-        // ASSIGNMENTS (Tối ưu hóa mobile grid)
+        // ASSIGNMENTS (Giữ nguyên)
         const renderAssignments = () => {
             if (state.ui.isCreatingAssignment) {
                 if (state.ui.isSelectingBankQuestions) {
-                    return renderQuestionSelectionFromBank();
+                    return renderQuestionSelectionFromBank(); 
                 }
                 return renderCreateAssignmentForm();
             }
             if (state.ui.takingAssignmentId) {
-                // CHÚ Ý: Logic update Assignment Question UI sẽ nằm trong hàm riêng
                 return renderTakeAssignment();
             }
             if (state.ui.viewAssignmentId) {
@@ -1188,11 +990,11 @@
 
                 let actionBtn = '';
                 if (!isTeacher) { // Học sinh
-                    if (sub) actionBtn = `<button onclick="viewSubmissionResult('${sub.id}')" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-medium text-sm">Xem kết quả (${sub.score}đ)</button>`;
-                    else actionBtn = `<button onclick="startAssignment('${a.id}')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium text-sm">Làm bài</button>`;
+                    if (sub) actionBtn = `<button onclick="viewSubmissionResult('${sub.id}')" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-medium">Xem kết quả (${sub.score}đ)</button>`;
+                    else actionBtn = `<button onclick="startAssignment('${a.id}')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium">Làm bài</button>`;
                 } else { // Giáo viên
                     actionBtn = `
-                        <div class="flex gap-2 text-xs sm:text-sm font-medium">
+                        <div class="flex gap-2 text-sm font-medium">
                             <button onclick="viewAssignmentDetails('${a.id}')" class="flex-1 flex items-center justify-center gap-1 bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded-lg transition">
                                 <i data-lucide="eye" size="16"></i> Xem/Sửa
                             </button>
@@ -1204,14 +1006,14 @@
                 }
 
                 return `
-                    <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition">
-                        <div class="flex justify-between items-start mb-3">
-                            <div class="bg-blue-100 p-2 rounded-lg text-blue-600"><i data-lucide="book-open" size="20"></i></div>
-                            ${sub ? '<i data-lucide="check-circle" class="text-green-500" size="20"></i>' : ''}
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition">
+                        <div class="flex justify-between items-start mb-4">
+                            <div class="bg-blue-100 p-3 rounded-lg text-blue-600"><i data-lucide="book-open"></i></div>
+                            ${sub ? '<i data-lucide="check-circle" class="text-green-500"></i>' : ''}
                         </div>
                         <h4 class="text-lg font-bold text-slate-800 mb-2">${a.title}</h4>
                         <p class="text-slate-500 text-sm mb-2">${a.questions.length} câu hỏi</p>
-                        ${isTeacher ? `<p class="text-xs text-blue-500 mb-4 truncate">Giao cho: ${assignedClasses || 'Chưa giao lớp nào'}</p>` : ''}
+                        ${isTeacher ? `<p class="text-xs text-blue-500 mb-4">Giao cho: ${assignedClasses || 'Chưa giao lớp nào'}</p>` : ''}
                         ${actionBtn}
                     </div>
                 `;
@@ -1219,16 +1021,16 @@
 
             return `
                 ${isTeacher ? 
-                    `<button onclick="toggleCreate(true)" class="mb-6 bg-blue-600 hover:bg-blue-700 text-white px-4 sm:px-6 py-3 rounded-xl font-bold shadow-md flex items-center gap-2 text-sm sm:text-base">
+                    `<button onclick="toggleCreate(true)" class="mb-6 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-xl font-bold shadow-md flex items-center gap-2">
                         <i data-lucide="plus-circle"></i> Tạo bài tập
                     </button>` : ''}
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     ${list || `<p class="text-slate-500">${isTeacher ? 'Bạn chưa tạo bài tập nào.' : 'Chưa có bài tập nào được giao cho lớp của bạn.'}</p>`}
                 </div>
             `;
         };
         
-        // QUESTION BANK (Tối ưu hóa mobile grid)
+        // QUESTION BANK (Giữ nguyên)
         const renderQuestionBank = () => {
             const isTeacher = state.profile.role === 'teacher';
             if (!isTeacher) return `<p class="text-red-500">Bạn không có quyền truy cập tính năng này.</p>`;
@@ -1243,16 +1045,16 @@
             const myBanks = state.data.questionBanks.filter(b => b.createdBy === state.user.uid);
             
             const list = myBanks.map(bank => `
-                <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition">
-                    <div class="flex justify-between items-start mb-3">
-                        <div class="bg-purple-100 p-2 rounded-lg text-purple-600"><i data-lucide="library" size="20"></i></div>
+                <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition">
+                    <div class="flex justify-between items-start mb-4">
+                        <div class="bg-purple-100 p-3 rounded-lg text-purple-600"><i data-lucide="library"></i></div>
                     </div>
                     <h4 class="text-lg font-bold text-slate-800 mb-2">${bank.title}</h4>
                     <p class="text-slate-500 text-sm mb-4">${bank.questions.length} câu hỏi</p>
-                    <div class="flex gap-2 text-xs sm:text-sm font-medium">
+                    <div class="flex gap-2 text-sm font-medium">
                         <button onclick="viewBankDetails('${bank.id}')" class="flex-1 flex items-center justify-center gap-1 bg-purple-500 hover:bg-purple-600 text-white py-2 rounded-lg transition">
                             <i data-lucide="eye" size="16"></i> Xem/Sửa
-                            </button>
+                        </button>
                         <button onclick="confirmDeleteBank('${bank.id}', '${bank.title}')" class="flex-1 flex items-center justify-center gap-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg transition">
                             <i data-lucide="trash-2" size="16"></i> Xóa
                         </button>
@@ -1261,15 +1063,10 @@
             `).join('');
 
             return `
-                <div class="flex flex-wrap gap-4 mb-6">
-                    <button onclick="setBankMode('create')" class="bg-purple-600 hover:bg-purple-700 text-white px-4 sm:px-6 py-3 rounded-xl font-bold shadow-md flex items-center gap-2 text-sm sm:text-base">
-                        <i data-lucide="plus-circle"></i> Tạo Ngân hàng đề mới
-                    </button>
-                    <button onclick="toggleImportData(true)" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 sm:px-6 py-3 rounded-xl font-bold shadow-md flex items-center gap-2 text-sm sm:text-base">
-                        <i data-lucide="file-text"></i> Nhập dữ liệu từ File
-                    </button>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <button onclick="setBankMode('create')" class="mb-6 bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-xl font-bold shadow-md flex items-center gap-2">
+                    <i data-lucide="plus-circle"></i> Tạo Ngân hàng đề mới
+                </button>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                     ${list || '<p class="text-slate-500">Bạn chưa tạo ngân hàng đề nào.</p>'}
                 </div>
             `;
@@ -1279,16 +1076,13 @@
             const qList = state.ui.newAssignment.questions.map((q, idx) => renderQuestionDisplay(q, idx)).join('');
 
             return `
-                <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-lg">
-                    <div class="flex justify-between mb-5 border-b pb-3">
+                <div class="bg-white p-6 rounded-2xl shadow-lg">
+                    <div class="flex justify-between mb-6">
                         <h3 class="text-xl font-bold text-purple-600">Tạo Ngân hàng đề mới</h3>
                         <button onclick="setBankMode('list')" class="text-slate-500 hover:text-red-500"><i data-lucide="x"></i></button>
                     </div>
-                    <div class="mb-5 flex flex-col sm:flex-row gap-4">
-                        <input id="new-bank-title" class="flex-1 text-lg font-bold border-b-2 border-slate-200 p-2 outline-none focus:border-purple-500" placeholder="Tiêu đề Ngân hàng đề...">
-                         <button onclick="toggleImportData(true, true)" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg font-bold flex items-center justify-center gap-2 text-sm h-fit">
-                            <i data-lucide="upload" size="18"></i> Nhập từ File
-                        </button>
+                    <div class="mb-6">
+                        <input id="new-bank-title" class="w-full text-lg font-bold border-b-2 border-slate-200 p-2 outline-none focus:border-purple-500" placeholder="Tiêu đề Ngân hàng đề...">
                     </div>
                     
                     <h4 class="text-lg font-bold text-slate-800 mb-3">Danh sách câu hỏi (${state.ui.newAssignment.questions.length})</h4>
@@ -1300,7 +1094,7 @@
                 </div>
             `;
         };
-        
+
         const renderViewQuestionBank = () => {
             const bank = state.data.questionBanks.find(b => b.id === state.ui.selectedBankId);
             if (!bank) return `<p class="text-red-500">Không tìm thấy ngân hàng đề.</p>`;
@@ -1315,20 +1109,15 @@
             const qList = state.ui.newAssignment.questions.map((q, idx) => renderQuestionDisplay(q, idx)).join('');
 
             return `
-                <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-lg">
-                    <div class="flex justify-between mb-5 border-b pb-3">
+                <div class="bg-white p-6 rounded-2xl shadow-lg">
+                    <div class="flex justify-between mb-6 border-b pb-4">
                         <h3 class="text-xl font-bold text-purple-600">Chỉnh sửa Ngân hàng đề</h3>
                         <button onclick="viewBankDetails(null)" class="text-slate-500 hover:text-red-500"><i data-lucide="x"></i></button>
                     </div>
                     
-                    <div class="mb-5 flex flex-col sm:flex-row gap-4">
-                        <div class="flex-1 w-full">
-                            <label class="block text-sm font-medium text-slate-600 mb-1">Tiêu đề</label>
-                            <input id="edit-bank-title" class="w-full text-lg font-bold border-b-2 border-slate-200 p-2 outline-none focus:border-purple-500" value="${state.ui.newAssignment.title}">
-                        </div>
-                        <button onclick="toggleImportData(true, true)" class="self-end bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-lg font-bold flex items-center justify-center gap-2 text-sm h-fit">
-                            <i data-lucide="upload" size="18"></i> Nhập từ File
-                        </button>
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-slate-600 mb-1">Tiêu đề</label>
+                        <input id="edit-bank-title" class="w-full text-lg font-bold border-b-2 border-slate-200 p-2 outline-none focus:border-purple-500" value="${state.ui.newAssignment.title}">
                     </div>
                     
                     <h4 class="text-lg font-bold text-slate-800 mb-3">Danh sách câu hỏi (${state.ui.newAssignment.questions.length})</h4>
@@ -1340,109 +1129,15 @@
                 </div>
             `;
         }
-        
-        // --- Giao diện Modal Nhập dữ liệu từ File ---
 
-        const questionTypes = [
-            { id: 'vocab_mcq', label: '1. Trắc nghiệm (Từ vựng, Pinyin, Nghĩa)', example: 'từ vựng|pinyin|nghĩa' },
-            { id: 'listen_mcq', label: '2. Nghe âm thanh chọn nghĩa (Từ vựng)', example: 'từ vựng|pinyin|nghĩa' },
-            { id: 'fib', label: '3. Điền từ còn thiếu (FIB)', example: 'Câu có chỗ trống|từ cần điền' },
-            { id: 'jumble', label: '4. Xếp từ thành câu (Jumble)', example: 'Câu đúng cách nhau bằng dấu cách' },
-            { id: 'translation', label: '5. Dịch câu (Việt - Trung)', example: 'câu tiếng trung|câu tiếng việt' },
-            { id: 'listen_translate', label: '6. Nghe câu dịch nghĩa (Câu)', example: 'câu tiếng trung|câu tiếng việt' },
-            { id: 'listen_write', label: '7. Nghe câu viết lại (Câu)', example: 'câu tiếng trung|câu tiếng việt' },
-            // Loại 8, 9, 10... có thể thêm vào đây
-        ];
-        
-        const getImportInstructions = (type) => {
-             const typeData = questionTypes.find(t => t.id === type);
-             if (!typeData) return { instructions: 'Không tìm thấy loại câu hỏi.', structure: '' };
-
-             const instructionsMap = {
-                 'vocab_mcq': { 
-                     instructions: 'Tạo từ vựng, Pinyin, và Nghĩa. Hệ thống sẽ tự động tạo các bài trắc nghiệm chọn nghĩa, chọn Pinyin, và chọn từ.', 
-                     structure: 'từ vựng|pinyin|nghĩa' 
-                 },
-                 'listen_mcq': { 
-                     instructions: 'Tạo từ vựng, Pinyin, và Nghĩa. Hệ thống sẽ tự động tạo bài trắc nghiệm Nghe (phát âm từ) và chọn nghĩa.', 
-                     structure: 'từ vựng|pinyin|nghĩa' 
-                 },
-                 'fib': { 
-                     instructions: 'Mỗi dòng là một câu hỏi điền từ. Từ cần điền phải nằm giữa hai kí tự gạch đứng (ví dụ: |chợ|)', 
-                     structure: 'Hôm nay tôi đi |chợ| mua rau.' 
-                 },
-                 'jumble': { 
-                     instructions: 'Mỗi dòng là một câu hoàn chỉnh. Các từ trong câu phải được phân tách bằng DẤU CÁCH. Hệ thống sẽ xáo trộn các từ này.', 
-                     structure: 'Tôi yêu học tiếng Việt' 
-                 },
-                 'translation': { 
-                     instructions: 'Mỗi dòng là một cặp câu tiếng Trung - tiếng Việt. Câu hỏi sẽ yêu cầu dịch từ TV sang TC.', 
-                     structure: '我爱你|Tôi yêu bạn' 
-                 },
-                 'listen_translate': { 
-                     instructions: 'Mỗi dòng là một cặp câu tiếng Trung - tiếng Việt. Hệ thống sẽ phát âm câu TC và yêu cầu dịch sang TV.', 
-                     structure: '你好吗|Bạn khỏe không' 
-                 },
-                 'listen_write': { 
-                     instructions: 'Mỗi dòng là một cặp câu tiếng Trung - tiếng Việt. Hệ thống sẽ phát âm câu TC và yêu cầu viết lại câu TC.', 
-                     structure: '我是学生|Tôi là học sinh' 
-                 }
-             };
-             
-             return instructionsMap[type] || { instructions: 'Vui lòng chọn loại câu hỏi phù hợp.', structure: 'Không rõ' };
-        };
-
-
-        const renderImportDataModal = () => {
-            const currentType = state.ui.importQType;
-            const { instructions, structure } = getImportInstructions(currentType);
-
-            return `
-                <div class="fixed inset-0 bg-slate-900 bg-opacity-70 flex items-center justify-center z-50 fade-in" onclick="if (event.target === this) toggleImportData(false)">
-                    <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-2xl w-full max-w-sm sm:max-w-2xl transform transition-all mx-4">
-                        <div class="flex justify-between items-center mb-5 border-b pb-3">
-                            <h3 class="text-xl sm:text-2xl font-bold text-yellow-700">Nhập dữ liệu từ File (.txt)</h3>
-                            <button onclick="toggleImportData(false)" class="text-slate-500 hover:text-red-500"><i data-lucide="x"></i></button>
-                        </div>
-
-                        <div class="mb-6 space-y-4">
-                            <div>
-                                <label for="import-q-type" class="block text-sm font-medium text-slate-700 mb-1">Chọn loại dữ liệu đầu vào</label>
-                                <select id="import-q-type" onchange="setImportQType(this.value)" class="w-full p-3 border-2 rounded-lg bg-slate-50 focus:border-yellow-500">
-                                    ${questionTypes.map(t => `<option value="${t.id}" ${currentType === t.id ? 'selected' : ''}>${t.label}</option>`).join('')}
-                                </select>
-                            </div>
-
-                            <div class="bg-yellow-50 border-l-4 border-yellow-400 p-4 rounded-lg">
-                                <p class="font-bold text-yellow-800 mb-2">Định dạng file TXT cho loại này:</p>
-                                <p class="text-sm text-yellow-700 mb-2">${instructions}</p>
-                                <div class="bg-yellow-100 p-2 rounded text-xs font-mono border border-yellow-300 overflow-x-auto">
-                                    <span class="font-bold">Cấu trúc mẫu (Mỗi dòng):</span> ${structure}
-                                </div>
-                            </div>
-                            
-                            <div>
-                                <label for="file-upload" class="block text-sm font-medium text-slate-700 mb-1">Tải lên File TXT</label>
-                                <input type="file" id="file-upload" accept=".txt" class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                            </div>
-                        </div>
-
-                        <button onclick="handleFileImport()" class="w-full bg-yellow-600 text-white py-3 rounded-xl font-bold hover:bg-yellow-700 flex items-center justify-center gap-2">
-                            <i data-lucide="chevrons-down" size="20"></i> Tạo câu hỏi và Thêm vào Ngân hàng đề
-                        </button>
-                    </div>
-                </div>
-            `;
-        };
-        
-        // --- Giao diện dùng chung cho tạo/sửa assignment và bank (Tối ưu hóa mobile) ---
+        // --- Giao diện dùng chung cho tạo/sửa assignment và bank ---
         const renderQuestionInputSection = (isEditing) => `
             <div class="p-4 border border-blue-200 rounded-xl bg-blue-50 ${isEditing ? 'mt-6' : 'mb-6'}">
-                <h4 class="font-bold text-blue-800 mb-3 text-lg">Thêm câu hỏi ${isEditing ? 'vào ngân hàng đề' : 'trực tiếp'}</h4>
+                <h4 class="font-bold text-blue-800 mb-3">Thêm câu hỏi ${isEditing ? 'vào ngân hàng đề' : 'trực tiếp'}</h4>
                 
                 <div class="mb-3">
                     <label class="block text-sm font-medium text-blue-800 mb-1">Chọn loại câu hỏi</label>
-                    <select id="q-type-select" onchange="changeQuestionType(this.value)" class="w-full p-2 border border-blue-300 rounded-lg text-sm">
+                    <select id="q-type-select" onchange="changeQuestionType(this.value)" class="w-full p-2 border border-blue-300 rounded-lg">
                         <option value="mcq" ${state.ui.newQuestionType === 'mcq' ? 'selected' : ''}>1. Trắc nghiệm</option>
                         <option value="fib" ${state.ui.newQuestionType === 'fib' ? 'selected' : ''}>2. Điền từ còn thiếu</option>
                         <option value="jumble" ${state.ui.newQuestionType === 'jumble' ? 'selected' : ''}>3. Xếp từ thành câu</option>
@@ -1478,7 +1173,7 @@
             let audioInfo = '';
             
             if (q.audioText) {
-                audioInfo = `<p class="text-purple-600 font-bold mb-2 flex items-center gap-1 text-sm"><i data-lucide="volume-2" size="16"></i> Âm thanh: ${q.audioText}</p>`;
+                audioInfo = `<p class="text-purple-600 font-bold mb-2 flex items-center gap-1"><i data-lucide="volume-2" size="18"></i> Âm thanh: ${q.audioText}</p>`;
             }
 
             switch(q.type) {
@@ -1522,18 +1217,18 @@
             const isEditable = state.ui.viewAssignmentId || state.ui.bankMode === 'view' || state.ui.bankMode === 'create' || state.ui.isCreatingAssignment;
 
             return `
-                <div class="p-3 sm:p-4 border border-slate-200 rounded-xl bg-white mb-4 flex justify-between items-start">
+                <div class="p-4 border border-slate-200 rounded-xl bg-white mb-4 flex justify-between items-start">
                     <div>
-                        <div class="font-bold text-blue-600 mb-2 text-sm sm:text-base">Câu ${qIdx+1}: ${typeLabel}</div>
+                        <div class="font-bold text-blue-600 mb-2">Câu ${qIdx+1}: ${typeLabel}</div>
                         ${audioInfo}
-                        <p class="font-medium mb-2 text-sm">${mainText}</p>
-                        <div class="text-xs sm:text-sm text-slate-700">
+                        <p class="font-medium mb-2">${mainText}</p>
+                        <div class="text-sm text-slate-700">
                             ${content}
                         </div>
                     </div>
                     ${isEditable ? `
-                        <button onclick="removeQuestionInEdit(${qIdx})" class="text-red-400 hover:text-red-600 p-1 rounded-full bg-red-50 transition flex-shrink-0">
-                            <i data-lucide="minus-circle" size="16"></i>
+                        <button onclick="removeQuestionInEdit(${qIdx})" class="text-red-400 hover:text-red-600 p-1 rounded-full bg-red-50 transition">
+                            <i data-lucide="minus-circle" size="18"></i>
                         </button>
                     ` : ''}
                 </div>
@@ -1578,7 +1273,7 @@
                 case 'match':
                     inputs = `
                         <p class="text-sm text-slate-500 mb-2">Nhập 3 cặp ghép nối (Cột A: Câu hỏi, Cột B: Đáp án).</p>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                        <div class="grid grid-cols-2 gap-3 mb-3">
                             <input id="match-a0" class="p-2 border rounded" placeholder="Cột A - Câu hỏi 1">
                             <input id="match-b0" class="p-2 border rounded" placeholder="Cột B - Đáp án 1">
                             <input id="match-a1" class="p-2 border rounded" placeholder="Cột A - Câu hỏi 2">
@@ -1595,7 +1290,7 @@
                         <input id="trans-cn" class="w-full p-2 border rounded-lg mb-3" placeholder="Đáp án tiếng Trung (Ví dụ: 我爱你)">
                     `;
                     break;
-                        
+                    
                 case 'listen_mcq':
                     inputs = `
                         <p class="text-sm text-slate-500 mb-2">Nhập văn bản tiếng Trung cần phát âm (Web Speech API).</p>
@@ -1661,14 +1356,14 @@
             return `
                 <div class="mb-6 p-4 border border-green-300 rounded-xl bg-green-50">
                     <h4 class="font-bold text-green-800 mb-3">Chọn Lớp học để giao bài (Bắt buộc)</h4>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-40 overflow-y-auto pr-2">
+                    <div class="grid grid-cols-2 gap-3 max-h-40 overflow-y-auto">
                         ${myClasses.map(c => `
-                            <label class="flex items-center p-2 border rounded-lg cursor-pointer transition text-sm ${selectedIds.includes(c.id) ? 'bg-green-600 text-white border-green-700' : 'bg-white hover:bg-green-100'}">
+                            <label class="flex items-center p-2 border rounded-lg cursor-pointer transition ${selectedIds.includes(c.id) ? 'bg-green-600 text-white border-green-700' : 'bg-white hover:bg-green-100'}">
                                 <input type="checkbox" value="${c.id}" 
                                     onchange="handleClassSelection(this.value, this.checked)" 
                                     ${selectedIds.includes(c.id) ? 'checked' : ''} 
                                     class="mr-2 rounded text-green-600 focus:ring-green-500">
-                                <span class="truncate">${c.title} <span class="text-xs font-bold ${selectedIds.includes(c.id) ? 'text-green-300' : 'text-slate-500'}">(${c.classCode})</span></span>
+                                <span>${c.title} <span class="text-xs font-bold ${selectedIds.includes(c.id) ? 'text-green-300' : 'text-slate-500'}">(${c.classCode})</span></span>
                             </label>
                         `).join('')}
                     </div>
@@ -1691,7 +1386,7 @@
                  classSelectorHtml = `
                     <div class="mb-6 p-4 border border-green-300 rounded-xl bg-green-50">
                         <h4 class="font-bold text-green-800 mb-1">Giao bài cho Lớp:</h4>
-                        <p class="text-lg font-bold text-green-700">${contextClass.title}</p>
+                        <p class="text-xl font-bold text-green-700">${contextClass.title}</p>
                         <p class="text-sm text-green-700">Mã lớp: ${contextClass.classCode}</p>
                         <button onclick="toggleCreate(false); viewClass('${contextClass.id}')" class="mt-3 text-xs text-green-800 underline hover:no-underline">
                            (Quay lại lớp học)
@@ -1703,21 +1398,22 @@
             }
 
             return `
-                <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-lg">
-                    <div class="flex justify-between mb-5 border-b pb-3">
+                <div class="bg-white p-6 rounded-2xl shadow-lg">
+                    <div class="flex justify-between mb-6">
                         <h3 class="text-xl font-bold">Tạo bài tập mới</h3>
                         <button onclick="${isClassContext ? `toggleCreate(false); viewClass('${contextClass.id}')` : `toggleCreate(false)`}" class="text-slate-500 hover:text-red-500"><i data-lucide="x"></i></button>
                     </div>
-                    <div class="mb-5">
+                    <div class="mb-6">
                         <input id="new-assign-title" class="w-full text-lg font-bold border-b-2 border-slate-200 p-2 outline-none focus:border-blue-500" placeholder="Tiêu đề bài tập..." value="${state.ui.newAssignment.title}">
                     </div>
                     
+                    <!-- Class Selector -->
                     ${classSelectorHtml}
                     
                     <h4 class="text-lg font-bold text-slate-800 mb-3">Danh sách câu hỏi (${state.ui.newAssignment.questions.length})</h4>
                     <div id="questions-preview" class="space-y-4 border p-4 rounded-xl bg-slate-50">${qList || '<p class="text-slate-500">Chưa có câu hỏi nào.</p>'}</div>
 
-                    <div class="mb-5 space-y-4">
+                    <div class="mb-6 space-y-4">
                         <button onclick="setSelectingBankQuestions(true)" ${myBanks.length === 0 ? 'disabled' : ''} class="w-full bg-yellow-100 text-yellow-700 py-3 rounded-xl font-bold border border-yellow-300 hover:bg-yellow-200 transition ${myBanks.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}">
                             <i data-lucide="plus-square" size="18" class="inline-block mr-2"></i> Lấy câu hỏi từ Ngân hàng đề
                         </button>
@@ -1737,9 +1433,9 @@
             
             if (!selectedBank) {
                 return `
-                    <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-lg max-w-lg mx-auto">
-                        <h3 class="text-xl font-bold text-yellow-600 mb-5 border-b pb-3">Chọn Ngân hàng đề</h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="bg-white p-6 rounded-2xl shadow-lg">
+                        <h3 class="text-xl font-bold text-yellow-600 mb-6 border-b pb-3">Chọn Ngân hàng đề</h3>
+                        <div class="grid grid-cols-2 gap-4">
                             ${myBanks.map(bank => `
                                 <button onclick="selectBankToDraw('${bank.id}')" class="p-4 rounded-xl shadow-md border border-slate-200 hover:bg-slate-50 text-left">
                                     <p class="font-bold text-slate-800">${bank.title}</p>
@@ -1747,7 +1443,7 @@
                                 </button>
                             `).join('')}
                         </div>
-                        <button onclick="setSelectingBankQuestions(false)" class="mt-6 text-red-500 text-sm">Quay lại form Bài tập</button>
+                        <button onclick="setSelectingBankQuestions(false)" class="mt-6 text-red-500">Quay lại form Bài tập</button>
                     </div>
                 `;
             }
@@ -1762,12 +1458,12 @@
                 const typeLabel = getQuestionTypeLabel(q.type);
                 
                 return `
-                    <div class="p-3 border rounded-xl mb-3 flex justify-between items-center ${questionInAssignment ? 'bg-green-50 border-green-300' : 'bg-white border-slate-200'}">
-                        <div class="truncate pr-2">
-                            <p class="font-medium text-slate-700 text-sm truncate">${typeLabel}: ${q.text.length > 50 ? q.text.substring(0, 50) + '...' : q.text}</p>
+                    <div class="p-4 border rounded-xl mb-3 flex justify-between items-center ${questionInAssignment ? 'bg-green-50 border-green-300' : 'bg-white border-slate-200'}">
+                        <div>
+                            <p class="font-medium text-slate-700">${typeLabel}: ${q.text.length > 50 ? q.text.substring(0, 50) + '...' : q.text}</p>
                             <p class="text-xs text-slate-500 mt-1">${q.type === 'translation' ? `(VN: ${q.vietnamese})` : q.type === 'listen_translate' ? `(TC: ${q.audioText})` : ''}</p>
                         </div>
-                        <button onclick="selectQuestionFromBank(${idx}, ${questionInAssignment})" class="flex-shrink-0 px-3 py-1 rounded-lg text-xs font-bold ${questionInAssignment ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}">
+                        <button onclick="selectQuestionFromBank(${idx}, ${questionInAssignment})" class="px-4 py-1 rounded-lg text-sm font-bold ${questionInAssignment ? 'bg-red-500 hover:bg-red-600 text-white' : 'bg-blue-500 hover:bg-blue-600 text-white'}">
                             ${questionInAssignment ? 'Đã thêm' : 'Chọn'}
                         </button>
                     </div>
@@ -1775,25 +1471,27 @@
             }).join('');
 
             return `
-                <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-lg max-w-4xl mx-auto">
-                    <div class="flex justify-between items-center mb-5 border-b pb-3">
-                        <h3 class="text-xl font-bold text-yellow-600 truncate">Lấy từ: ${selectedBank.title}</h3>
+                <div class="bg-white p-6 rounded-2xl shadow-lg max-w-4xl mx-auto">
+                    <div class="flex justify-between items-center mb-6 border-b pb-3">
+                        <h3 class="text-xl font-bold text-yellow-600">Lấy từ: ${selectedBank.title}</h3>
                         <button onclick="setSelectingBankQuestions(false)" class="text-slate-500 hover:text-red-500"><i data-lucide="x"></i></button>
                     </div>
                     
-                    <div class="p-4 bg-blue-50 border border-blue-300 rounded-xl mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                    <!-- Lấy ngẫu nhiên -->
+                    <div class="p-4 bg-blue-50 border border-blue-300 rounded-xl mb-6 flex justify-between items-center">
                         <div>
-                            <label for="random-count" class="font-bold text-blue-700 block mb-1">Lấy ngẫu nhiên:</label>
+                            <label for="random-count" class="font-bold text-blue-700 block mb-2">Lấy ngẫu nhiên:</label>
                             <div class="flex items-center gap-2">
-                                <input id="random-count" type="number" min="1" max="${availableQuestions.length}" value="1" class="w-16 p-2 border rounded-lg text-center text-sm">
-                                <span class="text-slate-600 text-sm">câu hỏi (Tối đa ${availableQuestions.length})</span>
+                                <input id="random-count" type="number" min="1" max="${availableQuestions.length}" value="1" class="w-20 p-2 border rounded-lg text-center">
+                                <span class="text-slate-600">câu hỏi (Tối đa ${availableQuestions.length})</span>
                             </div>
                         </div>
-                        <button onclick="addRandomQuestions('${selectedBank.id}')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition text-sm w-full sm:w-auto">
+                        <button onclick="addRandomQuestions('${selectedBank.id}')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg font-bold transition">
                             <i data-lucide="shuffle" size="18" class="inline-block mr-1"></i> Thêm ngẫu nhiên
                         </button>
                     </div>
 
+                    <!-- Chọn thủ công -->
                     <h4 class="text-lg font-bold text-slate-800 mb-3">Chọn thủ công các câu hỏi:</h4>
                     <p class="text-sm text-slate-500 mb-4">Bài tập hiện tại có ${currentAssignmentQuestions} câu hỏi.</p>
                     <div class="h-96 overflow-y-auto pr-2">
@@ -1827,23 +1525,24 @@
 
 
             return `
-                <div class="bg-white p-4 sm:p-6 rounded-2xl shadow-lg">
-                    <div class="flex justify-between mb-5 border-b pb-3">
+                <div class="bg-white p-6 rounded-2xl shadow-lg">
+                    <div class="flex justify-between mb-6 border-b pb-4">
                         <h3 class="text-xl font-bold text-yellow-600">Chỉnh sửa bài tập</h3>
                         <button onclick="viewAssignmentDetails(null)" class="text-slate-500 hover:text-red-500"><i data-lucide="x"></i></button>
                     </div>
                     
-                    <div class="mb-5">
+                    <div class="mb-6">
                         <label class="block text-sm font-medium text-slate-600 mb-1">Tiêu đề</label>
                         <input id="edit-assign-title" class="w-full text-lg font-bold border-b-2 border-slate-200 p-2 outline-none focus:border-blue-500" value="${state.ui.newAssignment.title}">
                     </div>
                     
+                    <!-- Class Selector (chỉnh sửa) -->
                     ${renderClassSelector()}
 
                     <h4 class="text-lg font-bold text-slate-800 mb-3">Danh sách câu hỏi (${state.ui.newAssignment.questions.length})</h4>
                     <div id="questions-preview" class="space-y-4 border p-4 rounded-xl bg-slate-50">${qList || '<p class="text-slate-500">Chưa có câu hỏi nào.</p>'}</div>
 
-                    <div class="mb-5 space-y-4">
+                    <div class="mb-6 space-y-4">
                         <button onclick="setSelectingBankQuestions(true)" ${myBanks.length === 0 ? 'disabled' : ''} class="w-full bg-yellow-100 text-yellow-700 py-3 rounded-xl font-bold border border-yellow-300 hover:bg-yellow-200 transition ${myBanks.length === 0 ? 'opacity-50 cursor-not-allowed' : ''}">
                             <i data-lucide="plus-square" size="18" class="inline-block mr-2"></i> Thêm câu hỏi từ Ngân hàng đề
                         </button>
@@ -1856,8 +1555,8 @@
                 </div>
             `;
         };
-        
-        // --- HÀM RENDER MỘT CÂU HỎI ĐƠN LẺ KHI LÀM BÀI TẬP (Tối ưu hóa mobile) ---
+
+        // --- HÀM RENDER MỘT CÂU HỎI ĐƠN LẺ KHI LÀM BÀI (Giữ nguyên) ---
         const renderTakeAssignmentQuestion = (q, qIdx) => {
             const userAnswer = state.ui.assignmentAnswers[qIdx];
             let content = '';
@@ -1883,13 +1582,12 @@
                     header = q.type === 'listen_mcq' ? `Nghe và chọn nghĩa đúng:` : header;
                     content = q.options.map((opt, oIdx) => `
                         <button onclick="selectAnswer(${qIdx}, ${oIdx})" 
-                            class="w-full text-left p-3 sm:p-4 border-2 rounded-xl transition-colors font-medium text-base sm:text-lg
+                            class="w-full text-left p-4 border-2 rounded-xl transition-colors font-medium text-lg
                             ${userAnswer === oIdx ? 'bg-blue-600 text-white border-blue-600 shadow-md' : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-700'}">
                             <span class="font-bold mr-2">${String.fromCharCode(65 + oIdx)}.</span> ${opt}
                         </button>
                     `).join('');
-                    // Tối ưu hóa grid cho mobile
-                    content = `<div class="grid grid-cols-1 sm:grid-cols-2 gap-3">${content}</div>`;
+                    content = `<div class="space-y-3">${content}</div>`;
                     break;
 
                 case 'fib':
@@ -1921,18 +1619,18 @@
                     });
 
                     content = `
-                        <div class="mb-6 p-3 sm:p-4 border-2 border-dashed border-blue-300 rounded-xl bg-blue-50 min-h-[5rem] flex flex-wrap items-center">
+                        <div class="mb-6 p-4 border-2 border-dashed border-blue-300 rounded-xl bg-blue-50 min-h-[5rem] flex flex-wrap items-center">
                             ${placedWords.map((word, wIdx) => `
                                 <button onclick="removeJumbleWord(${qIdx}, '${word}', ${wIdx})" 
-                                    class="jumble-word bg-blue-600 text-white hover:bg-blue-700 transition transform active:scale-95 shadow-md text-sm">
+                                    class="jumble-word bg-blue-600 text-white hover:bg-blue-700 transition transform active:scale-95 shadow-md">
                                     ${word} <i data-lucide="x" class="inline w-3 h-3 ml-1"></i>
                                 </button>
                             `).join('')}
-                            ${placedWords.length === 0 ? '<span class="text-slate-500 italic text-sm">Nhấn vào từ bên dưới để sắp xếp</span>' : ''}
+                            ${placedWords.length === 0 ? '<span class="text-slate-500 italic">Nhấn vào từ bên dưới để sắp xếp</span>' : ''}
                         </div>
-                        <div class="flex flex-wrap gap-2 justify-center p-3 bg-slate-100 rounded-xl">
+                        <div class="flex flex-wrap gap-2 justify-center p-4 bg-slate-100 rounded-xl">
                             ${remainingWords.map(word => `
-                                <button onclick="addJumbleWord(${qIdx}, '${word}')" class="jumble-word text-sm">
+                                <button onclick="addJumbleWord(${qIdx}, '${word}')" class="jumble-word">
                                     ${word}
                                 </button>
                             `).join('')}
@@ -1946,23 +1644,25 @@
                     const currentMatches = state.ui.assignmentAnswers[qIdx] || {};
                     
                     content = `
-                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div class="grid grid-cols-2 gap-4">
+                            <!-- Column A (Fixed) -->
                             <div>
-                                <h4 class="font-bold text-slate-700 mb-2 text-lg">Cột A</h4>
+                                <h4 class="font-bold text-slate-700 mb-2 text-xl">Cột A</h4>
                                 <div class="space-y-3">
                                 ${colA.map((textA) => `
-                                    <div class="p-3 sm:p-4 bg-blue-100 border border-blue-200 rounded-xl text-blue-800 font-medium text-base sm:text-lg">${textA}</div>
+                                    <div class="p-4 bg-blue-100 border border-blue-200 rounded-xl text-blue-800 font-medium text-lg">${textA}</div>
                                 `).join('')}
                                 </div>
                             </div>
+                            <!-- Column B (Selectable) -->
                             <div>
-                                <h4 class="font-bold text-slate-700 mb-2 text-lg">Cột B (Ghép nối)</h4>
+                                <h4 class="font-bold text-slate-700 mb-2 text-xl">Cột B (Ghép nối)</h4>
                                 <div class="space-y-3">
                                 ${colA.map((_, aIdx) => {
                                     const selectedBIndex = currentMatches[aIdx] === undefined ? "" : currentMatches[aIdx];
                                     return `
                                         <select onchange="selectMatchAnswer(${qIdx}, ${aIdx}, this.value, ${JSON.stringify(colB).replace(/'/g, "\\'")})" 
-                                            class="w-full p-3 sm:p-4 border-2 rounded-xl bg-white appearance-none focus:border-green-500 transition cursor-pointer text-base sm:text-lg font-medium">
+                                            class="w-full p-4 border-2 rounded-xl bg-white appearance-none focus:border-green-500 transition cursor-pointer text-lg font-medium">
                                             <option value="">-- Chọn đáp án cho A${aIdx+1} --</option>
                                             ${colB.map((textB, bIdx) => `
                                                 <option value="${bIdx}" ${selectedBIndex === bIdx ? 'selected' : ''}>${textB}</option>
@@ -1984,7 +1684,7 @@
                         <input type="text" id="${inputId}" 
                             oninput="captureInputAnswer(${qIdx}, this.value)" 
                             value="${initialValue}"
-                            class="w-full max-w-lg p-3 sm:p-4 text-base sm:text-xl border-2 border-slate-300 rounded-xl focus:border-blue-500 outline-none text-center font-bold" 
+                            class="w-full max-w-lg p-4 text-xl border-2 border-slate-300 rounded-xl focus:border-blue-500 outline-none text-center font-bold" 
                             placeholder="${placeholderText}" />
                     </div>
                 `;
@@ -1993,60 +1693,12 @@
 
             return `
                 <div class="mb-8 fade-in text-center">
-                    <div class="text-xl sm:text-2xl font-bold text-slate-800 mb-4 leading-relaxed">${header}</div>
+                    <div class="text-2xl font-bold text-slate-800 mb-4 leading-relaxed">${header}</div>
                     ${audioButton}
                     <div class="text-left">${content}</div>
                 </div>
             `;
         };
-
-        // --- HÀM CẬP NHẬT UI CỤC BỘ CHO CHẾ ĐỘ LÀM BÀI TẬP (FIX SCROLL JUMP) ---
-        window.updateAssignmentQuestionUI = (assign, qIndex) => {
-            const questionEl = document.getElementById('assignment-question-content');
-            if (!questionEl) return;
-            
-            const totalQuestions = assign.questions.length;
-            const currentQ = assign.questions[qIndex];
-            const questionHtml = renderTakeAssignmentQuestion(currentQ, qIndex);
-
-            // Gán lại nội dung câu hỏi
-            questionEl.innerHTML = questionHtml;
-            
-            // Cập nhật bộ đếm
-            document.getElementById('assignment-q-counter').textContent = `Câu hỏi ${qIndex + 1} / ${totalQuestions}`;
-
-            // Cập nhật nút điều hướng
-            const isFirst = qIndex === 0;
-            const isLast = qIndex === totalQuestions - 1;
-            
-            const prevBtn = document.getElementById('prev-q-btn');
-            const nextContainer = document.getElementById('next-q-btn-container');
-
-            if (prevBtn) {
-                prevBtn.disabled = isFirst;
-                prevBtn.classList.toggle('text-slate-400', isFirst);
-                prevBtn.classList.toggle('cursor-not-allowed', isFirst);
-                prevBtn.classList.toggle('bg-slate-100', isFirst);
-                prevBtn.classList.toggle('bg-slate-200', !isFirst);
-                prevBtn.classList.toggle('hover:bg-slate-300', !isFirst);
-            }
-
-            if (nextContainer) {
-                nextContainer.innerHTML = isLast ? `
-                    <button onclick="submitAssignment()" class="flex-1 ml-2 sm:ml-4 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold text-base sm:text-lg shadow-lg">
-                        <i data-lucide="send" size="20" class="inline-block mr-1"></i> Nộp bài
-                    </button>
-                ` : `
-                    <button id="next-q-btn" onclick="goToNextQuestion()" 
-                        class="flex items-center gap-2 px-4 sm:px-6 py-3 rounded-xl font-bold transition bg-blue-600 hover:bg-blue-700 text-white text-base">
-                        Tiến <i data-lucide="arrow-right" size="20"></i>
-                    </button>
-                `;
-            }
-
-            renderIcons();
-        };
-
 
         const renderTakeAssignment = () => {
             const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
@@ -2072,45 +1724,46 @@
             const questionHtml = renderTakeAssignmentQuestion(currentQ, qIndex);
 
             return `
-                <div class="max-w-3xl mx-auto bg-white p-4 sm:p-8 rounded-2xl shadow-lg">
+                <div class="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg">
                     <div class="flex justify-between items-center mb-6 pb-4 border-b">
-                        <h3 class="text-xl sm:text-2xl font-bold truncate">${assign.title}</h3>
+                        <h3 class="text-2xl font-bold">${assign.title}</h3>
                         <button onclick="startAssignment(null)" class="text-slate-400 hover:text-red-500"><i data-lucide="x"></i></button>
                     </div>
                     
+                    <!-- Question Counter -->
                     <div class="text-center mb-6">
-                        <span id="assignment-q-counter" class="bg-blue-100 text-blue-700 px-4 py-2 rounded-full font-bold text-sm">
+                        <span class="bg-blue-100 text-blue-700 px-4 py-2 rounded-full font-bold text-sm">
                             Câu hỏi ${qIndex + 1} / ${totalQuestions}
                         </span>
                     </div>
 
-                    <div id="assignment-question-content">${questionHtml}</div>
+                    <!-- Single Question Content -->
+                    <div>${questionHtml}</div>
 
+                    <!-- Navigation and Submit Controls -->
                     <div class="mt-8 pt-6 border-t flex justify-between items-center">
-                        <button id="prev-q-btn" onclick="goToPreviousQuestion()" 
-                            class="flex items-center gap-2 px-4 sm:px-6 py-3 rounded-xl font-bold transition text-base ${isFirst ? 'text-slate-400 cursor-not-allowed bg-slate-100' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'}" 
+                        <button onclick="goToPreviousQuestion()" 
+                            class="flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition ${isFirst ? 'text-slate-400 cursor-not-allowed bg-slate-100' : 'bg-slate-200 hover:bg-slate-300 text-slate-700'}" 
                             ${isFirst ? 'disabled' : ''}>
                             <i data-lucide="arrow-left" size="20"></i> Lùi
                         </button>
                         
-                        <div id="next-q-btn-container">
-                            ${isLast ? `
-                                <button onclick="submitAssignment()" class="flex-1 ml-2 sm:ml-4 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold text-base sm:text-lg shadow-lg">
-                                    <i data-lucide="send" size="20" class="inline-block mr-1"></i> Nộp bài
-                                </button>
-                            ` : `
-                                <button id="next-q-btn" onclick="goToNextQuestion()" 
-                                    class="flex items-center gap-2 px-4 sm:px-6 py-3 rounded-xl font-bold transition bg-blue-600 hover:bg-blue-700 text-white text-base">
-                                    Tiến <i data-lucide="arrow-right" size="20"></i>
-                                </button>
-                            `}
-                        </div>
+                        ${isLast ? `
+                            <button onclick="submitAssignment()" class="flex-1 ml-4 bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold text-lg shadow-lg">
+                                <i data-lucide="send" size="20" class="inline-block mr-1"></i> Nộp bài
+                            </button>
+                        ` : `
+                            <button onclick="goToNextQuestion()" 
+                                class="flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition bg-blue-600 hover:bg-blue-700 text-white">
+                                Tiến <i data-lucide="arrow-right" size="20"></i>
+                            </button>
+                        `}
                     </div>
                 </div>
             `;
         };
         
-        // MỚI: RENDER KẾT QUẢ BÀI NỘP (Tối ưu hóa mobile)
+        // MỚI: RENDER KẾT QUẢ BÀI NỘP (Giữ nguyên)
         const renderSubmissionResult = () => {
             const sub = state.ui.viewSubmission;
             const assign = state.data.assignments.find(a => a.id === sub.assignmentId);
@@ -2180,12 +1833,12 @@
 
 
                 return `
-                    <div class="p-3 sm:p-4 rounded-xl border mb-4 ${bgColor}">
-                        <div class="flex items-start justify-between mb-2">
-                            <p class="font-bold text-slate-800 text-sm sm:text-base pr-2">Câu ${qIdx+1}: ${getQuestionTypeLabel(q.type)} - ${questionText}</p>
-                            <div class="flex items-center gap-2 font-medium text-sm flex-shrink-0">${icon} ${isCorrect ? 'Đúng' : 'Sai'}</div>
+                    <div class="p-4 rounded-xl border mb-4 ${bgColor}">
+                        <div class="flex items-center justify-between mb-2">
+                            <p class="font-bold text-slate-800">Câu ${qIdx+1}: ${getQuestionTypeLabel(q.type)} - ${questionText}</p>
+                            <div class="flex items-center gap-2 font-medium">${icon} ${isCorrect ? 'Đúng' : 'Sai'}</div>
                         </div>
-                        <p class="text-xs sm:text-sm text-slate-600">${explanation}</p>
+                        <p class="text-sm text-slate-600">${explanation}</p>
                     </div>
                 `;
             }
@@ -2194,19 +1847,19 @@
             const isPassed = sub.score >= 50;
 
             return `
-                <div class="max-w-3xl mx-auto bg-white p-4 sm:p-8 rounded-2xl shadow-lg">
+                <div class="max-w-3xl mx-auto bg-white p-8 rounded-2xl shadow-lg">
                     <div class="flex justify-between items-center mb-6 pb-4 border-b">
-                        <h3 class="text-xl sm:text-2xl font-bold truncate">Kết quả bài làm: ${assign.title}</h3>
+                        <h3 class="text-2xl font-bold">Kết quả bài làm: ${assign.title}</h3>
                         <button onclick="viewSubmissionResult(null)" class="text-slate-400 hover:text-red-500"><i data-lucide="x"></i></button>
                     </div>
 
-                    <div class="text-center p-4 sm:p-6 rounded-xl mb-6 ${isPassed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
+                    <div class="text-center p-6 rounded-xl mb-6 ${isPassed ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}">
                         <p class="text-sm font-medium">Điểm số của bạn:</p>
-                        <p class="text-5xl sm:text-6xl font-black">${sub.score}<span class="text-2xl sm:text-3xl">/100</span></p>
-                        <p class="text-base sm:text-lg font-bold mt-2">${isPassed ? '🎉 Chúc mừng, bạn đã hoàn thành tốt!' : '😢 Cần cố gắng hơn.'}</p>
+                        <p class="text-6xl font-black">${sub.score}<span class="text-3xl">/100</span></p>
+                        <p class="text-lg font-bold mt-2">${isPassed ? '🎉 Chúc mừng, bạn đã hoàn thành tốt!' : '😢 Cần cố gắng hơn.'}</p>
                     </div>
 
-                    <h4 class="text-lg sm:text-xl font-bold text-slate-700 mb-4">Chi tiết từng câu hỏi</h4>
+                    <h4 class="text-xl font-bold text-slate-700 mb-4">Chi tiết từng câu hỏi</h4>
                     <div class="space-y-4">
                         ${qHtml}
                     </div>
@@ -2214,74 +1867,62 @@
             `;
         };
 
-        // RANKING (Tối ưu hóa mobile)
+        // RANKING (Giữ nguyên)
         const renderRanking = () => {
             const sorted = [...state.data.users].sort((a,b) => (b.points||0) - (a.points||0));
-            
-            // Helper để render huy hiệu
-            const renderMedal = (rank) => {
-                if (rank === 1) return `<span class="text-2xl sm:text-3xl">🥇</span>`;
-                if (rank === 2) return `<span class="text-2xl sm:text-3xl">🥈</span>`;
-                if (rank === 3) return `<span class="text-2xl sm:text-3xl">🥉</span>`;
-                return `<span class="font-bold text-sm sm:text-base text-slate-500">#${rank}</span>`;
-            };
-
             return `
                 <div class="bg-white rounded-2xl shadow-sm overflow-hidden">
-                    <div class="bg-yellow-500 p-6 sm:p-8 text-center text-white">
-                        <i data-lucide="trophy" class="w-10 h-10 sm:w-12 sm:h-12 mx-auto drop-shadow-lg mb-2"></i>
-                        <h3 class="text-2xl sm:text-3xl font-bold">Bảng Xếp Hạng Điểm</h3>
+                    <div class="bg-yellow-400 p-6 flex justify-center">
+                        <i data-lucide="trophy" class="text-white w-16 h-16 drop-shadow-md"></i>
                     </div>
-                    <div class="p-4 sm:p-6">
-                        <div class="overflow-x-auto">
-                            <table class="w-full min-w-[400px]">
-                                <thead>
-                                    <tr class="text-left text-slate-500 text-xs sm:text-sm border-b bg-slate-50">
-                                        <th class="pb-3 pl-4 pt-3">Hạng</th>
-                                        <th class="pb-3 pt-3">Học sinh</th>
-                                        <th class="pb-3 text-right pr-4 pt-3">Điểm số</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${sorted.map((u, idx) => {
-                                        let isMe = u.uid === state.user.uid;
-                                        return `
-                                        <tr class="border-b last:border-0 hover:bg-slate-100 transition ${isMe ? 'bg-blue-50 border-blue-200' : ''}">
-                                            <td class="py-3 sm:py-4 pl-4 font-bold w-16">
-                                                ${renderMedal(idx+1)}
-                                            </td>
-                                            <td class="py-3 sm:py-4 flex items-center gap-3">
-                                                ${renderAvatar(u, 'w-8 h-8 sm:w-10 sm:h-10', 'text-sm')}
-                                                <span class="font-medium text-sm sm:text-base ${isMe ? 'text-blue-700' : 'text-slate-700'} truncate">${u.name} ${isMe ? '(Bạn)' : ''}</span>
-                                            </td>
-                                            <td class="py-3 sm:py-4 text-right pr-4 font-bold text-lg sm:text-xl text-yellow-600">${u.points || 0}</td>
-                                        </tr>`;
-                                    }).join('')}
-                                </tbody>
-                            </table>
-                        </div>
+                    <div class="p-6">
+                        <table class="w-full">
+                            <thead>
+                                <tr class="text-left text-slate-500 text-sm border-b">
+                                    <th class="pb-3 pl-4">Hạng</th>
+                                    <th class="pb-3">Học sinh</th>
+                                    <th class="pb-3 text-right pr-4">Điểm số</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${sorted.map((u, idx) => {
+                                    let isMe = u.uid === state.user.uid;
+                                    return `
+                                    <tr class="border-b last:border-0 hover:bg-slate-50 transition ${isMe ? 'bg-blue-50' : ''}">
+                                        <td class="py-4 pl-4 font-bold text-slate-500">#${idx+1}</td>
+                                        <td class="py-4 flex items-center gap-3">
+                                            <div class="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold text-white ${u.role === 'teacher' ? 'bg-purple-400' : 'bg-blue-400'}">
+                                                ${u.name.charAt(0)}
+                                            </div>
+                                            <span class="font-medium ${isMe ? 'text-blue-700' : 'text-slate-700'}">${u.name} ${isMe ? '(Bạn)' : ''}</span>
+                                        </td>
+                                        <td class="py-4 text-right pr-4 font-bold text-slate-800">${u.points || 0}</td>
+                                    </tr>`;
+                                }).join('')}
+                            </tbody>
+                        </table>
                     </div>
                 </div>
             `;
         };
 
-        // COMPETITION RENDERERS (Tối ưu hóa mobile)
+        // COMPETITION RENDERERS (Giữ nguyên)
 
         const renderCompetitionLobby = () => `
-             <div class="text-center py-8 sm:py-12 bg-white rounded-3xl shadow-xl max-w-lg mx-auto">
-                <div class="inline-block p-4 sm:p-6 bg-purple-100 rounded-full mb-4 sm:mb-6">
-                    <i data-lucide="swords" class="w-12 h-12 sm:w-16 sm:h-16 text-purple-600"></i>
+             <div class="text-center py-12 bg-white rounded-3xl shadow-xl">
+                <div class="inline-block p-6 bg-purple-100 rounded-full mb-6">
+                    <i data-lucide="swords" class="w-16 h-16 text-purple-600"></i>
                 </div>
-                <h2 class="text-2xl sm:text-3xl font-bold text-slate-800 mb-4 sm:mb-6">Đấu trường Từ vựng</h2>
+                <h2 class="text-3xl font-bold text-slate-800 mb-6">Đấu trường Từ vựng</h2>
                 <div class="mb-6">
-                    <p class="text-sm sm:text-base text-slate-500">Số lượng từ vựng hiện có: <span class="font-bold text-blue-600">${state.data.vocabulary.length}</span></p>
+                    <p class="text-slate-500">Số lượng từ vựng hiện có: <span class="font-bold text-blue-600">${state.data.vocabulary.length}</span></p>
                     <p class="text-xs text-slate-400 mt-1">(Dữ liệu load từ dataLMS/data.txt)</p>
                 </div>
-                <div class="flex flex-col sm:flex-row justify-center gap-4 sm:gap-8 px-4">
-                    <button onclick="createMatch()" class="bg-purple-600 hover:bg-purple-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-2xl font-bold text-base sm:text-lg shadow-xl transition transform hover:-translate-y-1">
+                <div class="flex justify-center gap-8">
+                    <button onclick="createMatch()" class="bg-purple-600 hover:bg-purple-700 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl transition transform hover:-translate-y-1">
                         Tạo Phòng Mới
                     </button>
-                    <button onclick="setCompetitionMode('join')" class="bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-8 py-3 sm:py-4 rounded-2xl font-bold text-base sm:text-lg shadow-xl transition transform hover:-translate-y-1">
+                    <button onclick="setCompetitionMode('join')" class="bg-blue-600 hover:bg-blue-700 text-white px-8 py-4 rounded-2xl font-bold text-lg shadow-xl transition transform hover:-translate-y-1">
                         Tham Gia Phòng
                     </button>
                 </div>
@@ -2289,81 +1930,69 @@
         `;
 
         const renderCompetitionJoin = () => `
-            <div class="max-w-sm mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-xl text-center">
-                <h3 class="text-xl sm:text-2xl font-bold text-slate-700 mb-5">Nhập Mã Phòng</h3>
-                <input id="room-code-input" type="text" class="w-full p-3 sm:p-4 border-2 border-slate-300 rounded-xl text-center text-xl font-bold tracking-widest uppercase mb-4" maxlength="6" placeholder="CODE">
+            <div class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-xl text-center">
+                <h3 class="text-2xl font-bold text-slate-700 mb-6">Nhập Mã Phòng</h3>
+                <input id="room-code-input" type="text" class="w-full p-4 border-2 border-slate-300 rounded-xl text-center text-xl font-bold tracking-widest uppercase mb-4" maxlength="6" placeholder="CODE">
                 <button onclick="joinMatch()" class="w-full bg-blue-600 text-white py-3 rounded-xl font-bold mb-4">Tham Gia</button>
-                <button onclick="setCompetitionMode('lobby')" class="text-slate-500 text-sm">Quay lại</button>
+                <button onclick="setCompetitionMode('lobby')" class="text-slate-500">Quay lại</button>
             </div>
         `;
 
         const renderCompetitionWaiting = (match) => {
             const isOwner = match.player1.uid === state.user.uid;
-            const p1Profile = state.data.users.find(u => u.uid === match.player1.uid);
-            const p2Profile = match.player2 ? state.data.users.find(u => u.uid === match.player2.uid) : null;
-            
             return `
-                <div class="max-w-md mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-xl text-center">
-                    <h3 class="text-xl sm:text-2xl font-bold text-slate-700 mb-2">Phòng chờ: <span class="text-purple-600">${match.roomCode}</span></h3>
-                    <p class="text-sm text-slate-500 mb-6">Chia sẻ mã này cho đối thủ.</p>
-                    <div class="flex justify-center gap-6 sm:gap-8 mb-8">
+                <div class="max-w-xl mx-auto bg-white p-8 rounded-2xl shadow-xl text-center">
+                    <h3 class="text-2xl font-bold text-slate-700 mb-2">Phòng chờ: <span class="text-purple-600">${match.roomCode}</span></h3>
+                    <p class="text-slate-500 mb-6">Chia sẻ mã này cho đối thủ.</p>
+                    <div class="flex justify-center gap-8 mb-8">
                         <div class="text-center">
-                            ${renderAvatar(p1Profile, 'w-14 h-14 sm:w-16 sm:h-16', 'text-xl')}
-                            <p class="font-bold text-blue-700 mt-2 text-sm sm:text-base">${match.player1.name}</p>
+                            <div class="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-2 text-blue-600 font-bold text-xl">${match.player1.name.charAt(0)}</div>
+                            <p class="font-bold text-blue-700">${match.player1.name}</p>
                         </div>
-                        <div class="self-center font-bold text-slate-300 text-lg sm:text-xl">VS</div>
+                        <div class="self-center font-bold text-slate-300 text-xl">VS</div>
                         <div class="text-center">
-                            ${match.player2 ? renderAvatar(p2Profile, 'w-14 h-14 sm:w-16 sm:h-16', 'text-xl') : `
-                                <div class="w-14 h-14 sm:w-16 sm:h-16 bg-slate-100 text-slate-400 rounded-full flex items-center justify-center mx-auto mb-2 font-bold text-xl">
-                                    ?
-                                </div>
-                            `}
-                            <p class="font-bold ${match.player2 ? 'text-red-700' : 'text-slate-400'} mt-2 text-sm sm:text-base">${match.player2 ? match.player2.name : 'Đang chờ...'}</p>
+                            <div class="w-16 h-16 ${match.player2 ? 'bg-red-100 text-red-600' : 'bg-slate-100 text-slate-400'} rounded-full flex items-center justify-center mx-auto mb-2 font-bold text-xl">
+                                ${match.player2 ? match.player2.name.charAt(0) : '?'}
+                            </div>
+                            <p class="font-bold ${match.player2 ? 'text-red-700' : 'text-slate-400'}">${match.player2 ? match.player2.name : 'Đang chờ...'}</p>
                         </div>
                     </div>
-                    ${isOwner && match.player2 ? `<button onclick="startMatch('${match.id}')" class="bg-green-600 text-white py-3 px-6 sm:px-8 rounded-xl font-bold text-base sm:text-lg shadow-md transition transform hover:-translate-y-1 animate-pulse">Bắt đầu ngay</button>` : ''}
-                    ${!match.player2 ? `<button onclick="leaveMatch('${match.id}')" class="mt-4 text-red-500 text-sm">Hủy phòng</button>` : ''}
+                    ${isOwner && match.player2 ? `<button onclick="startMatch('${match.id}')" class="bg-green-600 text-white py-3 px-8 rounded-xl font-bold text-lg animate-pulse">Bắt đầu ngay</button>` : ''}
+                    ${!match.player2 ? `<button onclick="leaveMatch('${match.id}')" class="mt-4 text-red-500">Hủy phòng</button>` : ''}
                 </div>
             `;
         };
 
         const renderCompetitionPlaying = (match) => {
-            // Tối ưu hóa layout cho mobile
-            const isMeP1 = match.player1.uid === state.user.uid;
-            
             return `
                 <div id="match-playing-container" class="max-w-4xl mx-auto">
-                    <!-- Scoreboard -->
-                    <div class="flex justify-between gap-4 mb-6">
-                        <div class="bg-blue-600 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl shadow-lg transition-all duration-300 flex items-center gap-3 w-1/2" id="p1-box">
-                            ${renderAvatar(state.data.users.find(u => u.uid === match.player1.uid), 'w-8 h-8', 'text-sm')}
-                            <div class="truncate">
-                                <p class="text-xs sm:text-sm opacity-80 truncate">${match.player1.name} ${isMeP1 ? '(Bạn)' : ''}</p>
-                                <p class="text-2xl sm:text-3xl font-bold" id="p1-score">${match.player1.score}</p>
-                            </div>
+                    <!-- Score Board with IDs -->
+                    <div class="flex justify-between mb-8">
+                        <div class="bg-blue-600 text-white px-6 py-3 rounded-xl shadow-lg transition-all duration-300" id="p1-box">
+                            <p class="text-sm opacity-80">${match.player1.name}</p>
+                            <p class="text-3xl font-bold" id="p1-score">${match.player1.score}</p>
                         </div>
-                        <div class="bg-red-500 text-white px-4 py-2 sm:px-6 sm:py-3 rounded-xl shadow-lg text-right transition-all duration-300 flex items-center gap-3 w-1/2" id="p2-box">
-                            <div class="truncate text-left flex-1">
-                                <p class="text-xs sm:text-sm opacity-80 truncate">${match.player2.name} ${!isMeP1 ? '(Bạn)' : ''}</p>
-                                <p class="text-2xl sm:text-3xl font-bold" id="p2-score">${match.player2.score}</p>
-                            </div>
-                            ${renderAvatar(state.data.users.find(u => u.uid === match.player2.uid), 'w-8 h-8', 'text-sm')}
+                        <div class="bg-red-500 text-white px-6 py-3 rounded-xl shadow-lg text-right transition-all duration-300" id="p2-box">
+                            <p class="text-sm opacity-80">${match.player2.name}</p>
+                            <p class="text-3xl font-bold" id="p2-score">${match.player2.score}</p>
                         </div>
                     </div>
 
                     <!-- Question Card -->
-                    <div class="bg-white p-4 sm:p-8 rounded-3xl shadow-2xl text-center border-b-8 border-slate-200">
-                        <div class="mb-4 sm:mb-6">
-                            <span id="q-counter" class="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-xs sm:text-sm font-bold uppercase"></span>
+                    <div class="bg-white p-8 rounded-3xl shadow-2xl text-center border-b-8 border-slate-200">
+                        <div class="mb-6">
+                            <span id="q-counter" class="bg-slate-100 text-slate-600 px-3 py-1 rounded-full text-sm font-bold uppercase"></span>
                         </div>
                         
                         <div id="audio-container" class="mb-4 hidden"></div>
                         
-                        <h2 id="q-text" class="text-xl sm:text-3xl font-medium text-slate-700 mb-6 sm:mb-8 leading-relaxed min-h-[3rem] sm:min-h-[4rem] flex items-center justify-center">
-                            </h2>
+                        <h2 id="q-text" class="text-2xl md:text-3xl font-medium text-slate-700 mb-8 leading-relaxed min-h-[4rem] flex items-center justify-center">
+                            <!-- Question Text Here -->
+                        </h2>
 
-                        <div id="options-grid" class="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                            </div>
+                        <div id="options-grid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <!-- Options Buttons Here -->
+                        </div>
                     </div>
                 </div>
             `;
@@ -2384,13 +2013,15 @@
             // Highlight leader
             const p1Box = document.getElementById('p1-box');
             const p2Box = document.getElementById('p2-box');
-            p1Box.classList.remove('scale-105', 'ring-4', 'ring-blue-300');
-            p2Box.classList.remove('scale-105', 'ring-4', 'ring-red-300');
-
             if (match.player1.score > match.player2.score) {
                 p1Box.classList.add('scale-105', 'ring-4', 'ring-blue-300');
+                p2Box.classList.remove('scale-105', 'ring-4', 'ring-red-300');
             } else if (match.player2.score > match.player1.score) {
                 p2Box.classList.add('scale-105', 'ring-4', 'ring-red-300');
+                p1Box.classList.remove('scale-105', 'ring-4', 'ring-blue-300');
+            } else {
+                p1Box.classList.remove('scale-105', 'ring-4', 'ring-blue-300');
+                p2Box.classList.remove('scale-105', 'ring-4', 'ring-red-300');
             }
 
             // Nếu câu hỏi hiện tại đã được trả lời, vô hiệu hóa các nút
@@ -2404,7 +2035,7 @@
             const audioContainer = document.getElementById('audio-container');
             if (audioText) {
                 audioContainer.innerHTML = `
-                    <button onclick="speakWord('${audioText.replace(/'/g, "\\'")}', 'zh-CN')" class="inline-flex items-center gap-2 bg-purple-100 text-purple-700 px-4 py-2 sm:px-6 sm:py-3 rounded-full font-bold hover:bg-purple-200 transition text-sm sm:text-base ${buttonsDisabled ? 'opacity-50 cursor-not-allowed' : ''}" ${buttonsDisabled ? 'disabled' : ''}>
+                    <button onclick="speakWord('${audioText.replace(/'/g, "\\'")}', 'zh-CN')" class="inline-flex items-center gap-2 bg-purple-100 text-purple-700 px-6 py-3 rounded-full font-bold hover:bg-purple-200 transition ${buttonsDisabled ? 'opacity-50 cursor-not-allowed' : ''}" ${buttonsDisabled ? 'disabled' : ''}>
                         <i data-lucide="volume-2"></i> Nghe âm thanh
                     </button>`;
                 audioContainer.classList.remove('hidden');
@@ -2432,11 +2063,11 @@
                         <div class="text-center mt-6 col-span-full">
                             <input type="text" id="arena-input-q-${qIndex}" 
                                 oninput="captureArenaInputAnswer(this.value)" 
-                                class="w-full max-w-xl p-3 sm:p-4 text-base sm:text-xl border-2 border-slate-300 rounded-xl focus:border-blue-500 outline-none text-center font-bold" 
+                                class="w-full max-w-xl p-4 text-xl border-2 border-slate-300 rounded-xl focus:border-blue-500 outline-none text-center font-bold" 
                                 placeholder="Nhập câu tiếng Trung đã nghe..." 
                                 ${buttonsDisabled ? 'disabled' : ''} />
                             <button onclick="handleArenaInputAnswer('${match.id}')" 
-                                class="mt-4 bg-blue-500 text-white px-4 sm:px-6 py-3 rounded-xl font-bold hover:bg-blue-600 transition text-base"
+                                class="mt-4 bg-blue-500 text-white px-6 py-3 rounded-xl font-bold hover:bg-blue-600 transition"
                                 ${buttonsDisabled ? 'disabled' : ''}>
                                 <i data-lucide="send" size="20" class="inline-block mr-1"></i> Trả lời
                             </button>
@@ -2444,7 +2075,7 @@
                      `;
                 } else {
                     grid.innerHTML = q.options.map((opt, idx) => `
-                        <button id="opt-btn-${idx}" onclick="handleAnswerAttempt(${idx === q.correct}, '${match.id}', ${idx})" class="p-4 sm:p-6 bg-slate-50 border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700 rounded-2xl text-base sm:text-xl font-bold transition-all transform active:scale-95 text-slate-700 ${buttonsDisabled ? 'opacity-50 cursor-not-allowed' : ''}" ${buttonsDisabled ? 'disabled' : ''}>
+                        <button id="opt-btn-${idx}" onclick="handleAnswerAttempt(${idx === q.correct}, '${match.id}', ${idx})" class="p-6 bg-slate-50 border-2 border-slate-200 hover:border-blue-500 hover:bg-blue-50 hover:text-blue-700 rounded-2xl text-xl font-bold transition-all transform active:scale-95 text-slate-700 ${buttonsDisabled ? 'opacity-50 cursor-not-allowed' : ''}" ${buttonsDisabled ? 'disabled' : ''}>
                             ${opt}
                         </button>
                     `).join('');
@@ -2617,215 +2248,17 @@
                 case 'lobby': default: return renderCompetitionLobby();
             }
         };
-        
-        // MỚI: RENDER MODAL AVATAR (Tối ưu hóa mobile)
-        const renderAvatarModal = () => {
-            const previewUrl = state.ui.tempAvatarUrl || (state.profile.avatarType === 'url' ? state.profile.avatarUrl : null);
-            const previewEmoji = state.ui.tempAvatarType === 'emoji' ? state.ui.tempAvatarUrl : (state.profile.avatarType === 'emoji' ? state.profile.avatarUrl : null);
-            
-            // Tạo đối tượng profile tạm thời để render preview
-            const currentAvatar = { 
-                name: state.profile.name,
-                role: state.profile.role,
-                avatarUrl: state.profile.name.charAt(0), // Default fallback
-                avatarType: 'text'
-            };
-            
-            // Logic ưu tiên hiển thị: 1. Temp Emoji, 2. Temp URL, 3. Profile Emoji, 4. Profile URL
-            if (state.ui.tempAvatarType === 'emoji' && state.ui.tempAvatarUrl) {
-                currentAvatar.avatarUrl = state.ui.tempAvatarUrl;
-                currentAvatar.avatarType = 'emoji';
-            } else if (state.ui.tempAvatarType === 'url' && state.ui.tempAvatarUrl) {
-                currentAvatar.avatarUrl = state.ui.tempAvatarUrl;
-                currentAvatar.avatarType = 'url';
-            } else if (state.profile.avatarType === 'emoji') {
-                 currentAvatar.avatarUrl = state.profile.avatarUrl;
-                 currentAvatar.avatarType = 'emoji';
-            } else if (state.profile.avatarType === 'url') {
-                 currentAvatar.avatarUrl = state.profile.avatarUrl;
-                 currentAvatar.avatarType = 'url';
-            }
 
-
-            const emojiGrid = EMOJI_AVATARS.map(emoji => `
-                <button onclick="selectEmojiAvatar('${emoji}')" 
-                        class="p-2 sm:p-3 text-xl sm:text-2xl rounded-full hover:bg-slate-200 transition 
-                        ${currentAvatar.avatarType === 'emoji' && currentAvatar.avatarUrl === emoji ? 'bg-blue-200 ring-2 ring-blue-500' : 'bg-slate-100'}">
-                    ${emoji}
-                </button>
-            `).join('');
-
-            return `
-                <div class="fixed inset-0 bg-slate-900 bg-opacity-70 flex items-center justify-center z-50 fade-in" onclick="if (event.target === this) toggleAvatarModal(false)">
-                    <div class="bg-white p-6 sm:p-8 rounded-2xl shadow-2xl w-full max-w-sm sm:max-w-lg transform transition-all mx-4">
-                        <div class="flex justify-between items-center mb-5 border-b pb-3">
-                            <h3 class="text-xl sm:text-2xl font-bold text-blue-700">Chỉnh sửa Avatar</h3>
-                            <button onclick="toggleAvatarModal(false)" class="text-slate-500 hover:text-red-500"><i data-lucide="x"></i></button>
-                        </div>
-                        
-                        <div class="flex flex-col items-center mb-6">
-                            <div class="mb-4">
-                                ${renderAvatar(currentAvatar, 'w-20 h-20 sm:w-24 sm:h-24', 'text-3xl sm:text-4xl')}
-                            </div>
-                            
-                            <div class="w-full mb-4">
-                                <label for="avatar-upload" class="block text-sm font-medium text-slate-700 mb-2">Tải ảnh lên (URL sẽ hiển thị ở trên):</label>
-                                <input type="file" id="avatar-upload" accept="image/*" onchange="handleImageUpload(event)" 
-                                       class="w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100">
-                                <p class="text-xs text-red-500 mt-2" id="upload-status"></p>
-                            </div>
-                        </div>
-
-                        <div class="mb-6">
-                            <h4 class="font-bold text-slate-700 mb-3 text-base">Hoặc chọn Emoji có sẵn:</h4>
-                            <div class="grid grid-cols-6 gap-2 max-h-40 overflow-y-auto p-2 border rounded-xl bg-slate-50">
-                                ${emojiGrid}
-                            </div>
-                        </div>
-
-                        <button onclick="handleSaveAvatar()" class="w-full bg-green-600 text-white py-3 rounded-xl font-bold hover:bg-green-700 flex items-center justify-center gap-2 text-base">
-                            <i data-lucide="save" size="20"></i> Lưu Avatar
-                        </button>
-                    </div>
-                </div>
-            `;
-        };
 
         // --- 7. HANDLERS (Assignments, Question Bank, Competition & CLASSES) ---
         
-        // --- Avatar Handlers (Đã sửa) ---
-        window.toggleAvatarModal = (val) => {
-            state.ui.isAvatarModalOpen = val;
-            if (val) {
-                // Khi mở modal, set trạng thái tạm thời từ profile hiện tại
-                state.ui.tempAvatarUrl = state.profile.avatarUrl;
-                state.ui.tempAvatarType = state.profile.avatarType;
-            } else {
-                // Khi đóng modal, reset trạng thái tạm thời và input file
-                state.ui.tempAvatarUrl = null;
-                state.ui.tempAvatarType = null;
-                
-                const fileInput = document.getElementById('avatar-upload');
-                if (fileInput) {
-                    fileInput.value = '';
-                }
-                const statusEl = document.getElementById('upload-status');
-                if(statusEl) statusEl.textContent = '';
-            }
-            // Gọi renderApp() để render lại cả app và modal
-            renderApp();
-        };
-        
-        window.selectEmojiAvatar = (emoji) => {
-            state.ui.tempAvatarUrl = emoji;
-            state.ui.tempAvatarType = 'emoji';
-            
-            // THÊM: Reset input file khi chọn emoji
-            const fileInput = document.getElementById('avatar-upload');
-            if (fileInput) {
-                fileInput.value = '';
-                document.getElementById('upload-status').textContent = '';
-            }
-            
-            renderApp();
-        };
-
-        window.handleImageUpload = async (event) => {
-            const file = event.target.files[0];
-            if (!file) return;
-
-            const statusEl = document.getElementById('upload-status');
-            statusEl.textContent = 'Đang tải lên...';
-            statusEl.classList.remove('text-green-600', 'text-red-500');
-            statusEl.classList.add('text-blue-600');
-            
-            // THÊM: Xóa trạng thái emoji tạm thời khi bắt đầu tải ảnh
-            state.ui.tempAvatarType = 'url';
-
-            try {
-                // Tạo tham chiếu file trong Firebase Storage
-                const avatarRef = storageRef(storage, `avatars/${state.user.uid}/${file.name}`);
-                
-                // Tải file lên
-                const snapshot = await uploadBytes(avatarRef, file);
-                
-                // Lấy URL công khai
-                const downloadURL = await getDownloadURL(snapshot.ref);
-                
-                state.ui.tempAvatarUrl = downloadURL;
-                state.ui.tempAvatarType = 'url';
-                
-                statusEl.textContent = 'Tải lên thành công!';
-                statusEl.classList.remove('text-blue-600', 'text-red-500');
-                statusEl.classList.add('text-green-600');
-                
-                renderApp();
-                
-
-            } catch (e) {
-                console.error("Lỗi tải ảnh lên:", e);
-                statusEl.textContent = 'Lỗi tải ảnh lên. Vui lòng thử lại.';
-                statusEl.classList.remove('text-blue-600', 'text-green-600');
-                statusEl.classList.add('text-red-500');
-                
-                // THAY ĐỔI: Reset giá trị của input để cho phép chọn lại file
-                event.target.value = '';
-                state.ui.tempAvatarUrl = null;
-                state.ui.tempAvatarType = null;
-                renderApp();
-            }
-        };
-
-        window.handleSaveAvatar = async () => {
-            const newAvatarUrl = state.ui.tempAvatarUrl;
-            const newAvatarType = state.ui.tempAvatarType;
-
-            // Kiểm tra xem có thay đổi nào không (dù logic này cũng được xử lý bởi Firestore)
-            const isUnchanged = state.profile.avatarUrl === newAvatarUrl && state.profile.avatarType === newAvatarType;
-
-            if (isUnchanged) {
-                showToast("Không có thay đổi nào được lưu.");
-                toggleAvatarModal(false);
-                return;
-            }
-
-            // Trường hợp người dùng xóa ảnh (chọn default)
-            const isDefault = !newAvatarUrl;
-
-            if (isDefault) {
-                try {
-                     await updateDoc(doc(db, getPath('users'), state.user.uid), {
-                        avatarUrl: null,
-                        avatarType: null,
-                    });
-                    showToast("Đã xóa avatar!");
-                } catch (e) {
-                     showToast("Lỗi xóa avatar.", "error");
-                }
-            } else {
-                try {
-                    await updateDoc(doc(db, getPath('users'), state.user.uid), {
-                        avatarUrl: newAvatarUrl,
-                        avatarType: newAvatarType,
-                    });
-                    showToast("Đã lưu avatar thành công!");
-                } catch (e) {
-                    showToast("Lỗi lưu avatar.", "error");
-                    return;
-                }
-            }
-            
-            toggleAvatarModal(false);
-        };
-        
-        // --- Class Handlers (Giữ nguyên) ---
+        // --- Class Handlers ---
         window.toggleCreateClass = (val) => { state.ui.isCreatingClass = val; renderApp(); };
         window.viewClass = (id) => { 
             state.ui.viewClassId = id; 
             state.ui.isCreatingClass = false; 
             state.ui.viewClassMode = 'students'; // MỚI: Thêm chế độ xem mặc định
             state.ui.isCreatingAssignment = false; // Đảm bảo thoát form tạo bài tập khi chuyển lớp
-            state.ui.viewAssignmentId = null; // Đảm bảo thoát chế độ xem/sửa bài tập
             renderApp(); 
         };
         window.setViewClassMode = (mode) => {
@@ -2877,7 +2310,7 @@
             const confirmModal = document.createElement('div');
             confirmModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
             confirmModal.innerHTML = `
-                <div class="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full text-center mx-4">
+                <div class="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full text-center">
                     <p class="font-bold text-lg mb-4 text-slate-800">Xác nhận xóa Lớp học</p>
                     <p class="text-slate-600 mb-6">Bạn có chắc muốn xóa lớp "${title}"? Thao tác này sẽ KHÔNG xóa tài khoản học sinh, nhưng sẽ loại bỏ lớp này.</p>
                     <div class="flex justify-around gap-4">
@@ -2913,7 +2346,7 @@
             const confirmModal = document.createElement('div');
             confirmModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
             confirmModal.innerHTML = `
-                <div class="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full text-center mx-4">
+                <div class="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full text-center">
                     <p class="font-bold text-lg mb-4 text-slate-800">Xác nhận gỡ Học sinh</p>
                     <p class="text-slate-600 mb-6">Bạn có chắc muốn gỡ "${studentName}" khỏi lớp? Tài khoản của học sinh vẫn được giữ lại.</p>
                     <div class="flex justify-around gap-4">
@@ -2949,201 +2382,6 @@
             }
         };
         
-        // --- Handlers Modal Nhập dữ liệu ---
-        
-        // Mở/đóng modal nhập liệu
-        window.toggleImportData = (val, fromBankForm = false) => {
-            state.ui.isImportingBankData = val;
-            // Nếu mở modal từ trong form tạo/sửa bank, reset importQType và giữ bankMode
-            if (val && fromBankForm) {
-                 state.ui.importQType = 'vocab_mcq'; 
-            } 
-            // Nếu mở modal từ trang danh sách, chuyển sang chế độ tạo mới nếu chưa có
-            else if (val && state.ui.bankMode === 'list') {
-                 setBankMode('create');
-            }
-            renderApp();
-        }
-
-        window.setImportQType = (type) => { state.ui.importQType = type; renderApp(); };
-
-        // Hàm xử lý việc đọc và phân tích file
-        window.handleFileImport = () => {
-            const fileInput = document.getElementById('file-upload');
-            if (!fileInput.files.length) {
-                return showToast("Vui lòng chọn file .txt để tải lên.", "error");
-            }
-
-            const file = fileInput.files[0];
-            const reader = new FileReader();
-            const qType = state.ui.importQType;
-
-            reader.onload = (e) => {
-                const text = e.target.result;
-                const newQuestions = parseFileContent(text, qType);
-
-                if (newQuestions.length > 0) {
-                    state.ui.newAssignment.questions.push(...newQuestions);
-                    showToast(`Đã thêm thành công ${newQuestions.length} câu hỏi mới!`);
-                    toggleImportData(false); // Đóng modal và render lại form
-                } else {
-                    showToast("File không có nội dung hợp lệ hoặc sai định dạng. Vui lòng kiểm tra lại cấu trúc file TXT.", "error");
-                }
-            };
-
-            reader.onerror = () => {
-                showToast("Lỗi đọc file.", "error");
-            };
-
-            reader.readAsText(file);
-        };
-        
-        // Logic phân tích cú pháp file content
-        const parseFileContent = (text, qType) => {
-            const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-            const newQuestions = [];
-
-            lines.forEach(line => {
-                try {
-                    switch (qType) {
-                        case 'vocab_mcq': // Từ vựng|Pinyin|Nghĩa -> Tạo Trắc nghiệm (chọn nghĩa, pinyin, từ)
-                        case 'listen_mcq': // Từ vựng|Pinyin|Nghĩa -> Tạo Nghe (chọn nghĩa)
-                            const parts_v = line.split('|');
-                            if (parts_v.length < 3) throw new Error("Missing parts");
-                            const [word, pinyin, meaning] = parts_v.map(p => p.trim());
-                            
-                            // Lấy danh sách từ vựng hiện có để tạo distractors
-                            const vocabList = state.data.vocabulary;
-
-                            // Helper để lấy 3 đáp án sai (distractors)
-                            const getDistractors = (correctValue, field) => {
-                                const distractors = [];
-                                const candidates = shuffleArray([...vocabList]);
-                                for (const item of candidates) {
-                                    const value = item[field];
-                                    if (value !== correctValue && distractors.length < 3 && !distractors.includes(value)) {
-                                        distractors.push(value);
-                                    }
-                                    if (distractors.length === 3) break;
-                                }
-                                // Đảm bảo luôn có 4 đáp án (cả đúng và sai)
-                                while (distractors.length < 3) distractors.push(`[Distractor ${distractors.length + 1}]`);
-                                return distractors;
-                            };
-
-                            // Loại 1: Trắc nghiệm - Chọn Nghĩa (cho Từ)
-                            if (qType === 'vocab_mcq') {
-                                const meaningDistractors = getDistractors(meaning, 'meaning');
-                                const optionsM = shuffleArray([meaning, ...meaningDistractors]);
-                                newQuestions.push({
-                                    type: 'mcq',
-                                    text: `Nghĩa của từ **${word}** là gì?`,
-                                    options: optionsM,
-                                    correct: optionsM.indexOf(meaning)
-                                });
-
-                                // Loại 1: Trắc nghiệm - Chọn Pinyin (cho Từ)
-                                const pinyinDistractors = getDistractors(pinyin, 'pinyin');
-                                const optionsP = shuffleArray([pinyin, ...pinyinDistractors]);
-                                newQuestions.push({
-                                    type: 'mcq',
-                                    text: `Pinyin của từ **${word}** là gì?`,
-                                    options: optionsP,
-                                    correct: optionsP.indexOf(pinyin)
-                                });
-                            }
-
-
-                            // Loại 2: Nghe từ và chọn nghĩa
-                            if (qType === 'listen_mcq') {
-                                const meaningDistractors_L = getDistractors(meaning, 'meaning');
-                                const optionsLM = shuffleArray([meaning, ...meaningDistractors_L]);
-                                newQuestions.push({
-                                    type: 'listen_mcq',
-                                    audioText: word,
-                                    text: `Nghe từ "**${word}**" và chọn nghĩa đúng:`,
-                                    options: optionsLM,
-                                    correct: optionsLM.indexOf(meaning)
-                                });
-                            }
-
-                            break;
-
-                        case 'fib': // Câu có |Từ cần điền|
-                            // Tìm kiếm từ cần điền nằm giữa |...|
-                            const match_fib = line.match(/\|([^|]+)\|/);
-                            if (!match_fib) throw new Error("Missing | | markers");
-
-                            const answer = match_fib[1].trim();
-                            const text = line.replace(/\|[^|]+\|/, '[BLANK]').trim();
-                            
-                            if (!answer || !text) throw new Error("Invalid FIB structure");
-
-                            newQuestions.push({
-                                type: 'fib',
-                                text: text,
-                                answer: answer
-                            });
-                            break;
-
-                        case 'jumble': // Câu đúng (cách nhau bằng dấu cách)
-                            const words = line.split(/\s+/).filter(w => w.length > 0);
-                            if (words.length < 2) throw new Error("Sentence too short for Jumble");
-                            
-                            newQuestions.push({
-                                type: 'jumble',
-                                text: "Sắp xếp các từ thành câu đúng:",
-                                answer: words
-                            });
-                            break;
-
-                        case 'translation': // Câu TC|Câu TV
-                            const parts_t = line.split('|');
-                            if (parts_t.length < 2) throw new Error("Missing | separator for Translation");
-                            const [chinese_t, vietnamese_t] = parts_t.map(p => p.trim());
-                            
-                            newQuestions.push({
-                                type: 'translation',
-                                vietnamese: vietnamese_t,
-                                chinese: chinese_t,
-                                text: vietnamese_t // Text hiển thị là câu tiếng Việt cần dịch
-                            });
-                            break;
-
-                        case 'listen_translate': // Câu TC|Câu TV (Nghe TC, dịch TV)
-                            const parts_lt = line.split('|');
-                            if (parts_lt.length < 2) throw new Error("Missing | separator for Listen & Translate");
-                            const [chinese_lt, vietnamese_lt] = parts_lt.map(p => p.trim());
-                            
-                            newQuestions.push({
-                                type: 'listen_translate',
-                                audioText: chinese_lt,
-                                answer: vietnamese_lt,
-                                text: "Nghe câu tiếng Trung và dịch sang tiếng Việt." 
-                            });
-                            break;
-
-                        case 'listen_write': // Câu TC|Câu TV (Nghe TC, viết lại TC)
-                            const parts_lw = line.split('|');
-                            if (parts_lw.length < 2) throw new Error("Missing | separator for Listen & Write");
-                            const [chinese_lw, vietnamese_lw] = parts_lw.map(p => p.trim());
-                            
-                            newQuestions.push({
-                                type: 'listen_write',
-                                audioText: chinese_lw,
-                                answer: chinese_lw, // Đáp án là câu tiếng Trung
-                                text: "Nghe câu tiếng Trung và viết lại." 
-                            });
-                            break;
-                    }
-                } catch (error) {
-                    console.warn(`Bỏ qua dòng lỗi (Loại ${qType}): ${line} - ${error.message}`);
-                }
-            });
-
-            return newQuestions;
-        };
-
         // --- Handlers Ngân hàng đề (Giữ nguyên) ---
         window.setBankMode = (mode, id = null) => {
             state.ui.bankMode = mode;
@@ -3211,7 +2449,7 @@
             const confirmModal = document.createElement('div');
             confirmModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
             confirmModal.innerHTML = `
-                <div class="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full text-center mx-4">
+                <div class="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full text-center">
                     <p class="font-bold text-lg mb-4 text-slate-800">Xác nhận xóa Ngân hàng đề</p>
                     <p class="text-slate-600 mb-6">Bạn có chắc muốn xóa Ngân hàng đề "${title}"? Thao tác này không thể hoàn tác.</p>
                     <div class="flex justify-around gap-4">
@@ -3299,7 +2537,7 @@
         }
 
 
-        // --- Assignment Handlers (Giữ nguyên) ---
+        // --- Assignment Handlers ---
         window.handleClassSelection = (classId, isChecked) => {
             const currentIds = state.ui.newAssignment.selectedClassIds;
             if (isChecked) {
@@ -3312,8 +2550,8 @@
             renderApp();
         }
 
-        window.renderCompetitionCreate = () => `<div class="max-w-sm mx-auto bg-white p-6 sm:p-8 rounded-2xl shadow-xl text-center">
-                <h3 class="text-xl sm:text-2xl font-bold text-slate-700 mb-6">Tạo phòng đấu mới</h3>
+        window.renderCompetitionCreate = () => `<div class="max-w-md mx-auto bg-white p-8 rounded-2xl shadow-xl text-center">
+                <h3 class="text-2xl font-bold text-slate-700 mb-6">Tạo phòng đấu mới</h3>
                 <button onclick="createMatch()" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-xl font-bold shadow-md transition">
                     Tạo Phòng Ngay (10 Câu hỏi)
                 </button>
@@ -3343,7 +2581,6 @@
 
         window.createClassAssignment = (classId, classTitle) => {
             state.ui.isCreatingAssignment = true;
-            state.ui.viewAssignmentId = null; // MỚI: Reset viewAssignmentId khi tạo bài tập
             // Set giá trị mặc định cho title và classIds
             state.ui.newAssignment = { title: `Bài tập cho lớp ${classTitle}`, questions: [], selectedClassIds: [classId] };
             state.ui.viewClassId = classId; // Giữ ngữ cảnh lớp học
@@ -3351,30 +2588,6 @@
             renderApp();
         };
         
-        // Cập nhật viewAssignmentDetails để có thể gọi từ renderClassAssignments
-        window.viewAssignmentDetailsInClass = (id) => {
-            state.ui.isCreatingAssignment = false; 
-            state.ui.takingAssignmentId = null;
-            state.ui.viewSubmission = null;
-            state.ui.isSelectingBankQuestions = false; 
-            state.ui.viewAssignmentId = id;
-            
-            // Load data for editing
-            if (id) {
-                const assign = state.data.assignments.find(a => a.id === id);
-                if (assign) {
-                    state.ui.newAssignment = { 
-                        ...assign, 
-                        questions: JSON.parse(JSON.stringify(assign.questions)),
-                        selectedClassIds: assign.classIds || []
-                    };
-                }
-            } else {
-                state.ui.newAssignment = { title: '', questions: [], selectedClassIds: [] }; 
-            }
-            renderApp();
-        };
-        // Giữ lại viewAssignmentDetails ban đầu cho các tab khác
         window.viewAssignmentDetails = (id) => {
             state.ui.isCreatingAssignment = false; 
             state.ui.takingAssignmentId = null;
@@ -3396,7 +2609,6 @@
             }
             renderApp();
         };
-        
 
         window.removeQuestionInEdit = (qIdx) => {
             if (state.ui.newAssignment && state.ui.newAssignment.questions) {
@@ -3425,8 +2637,7 @@
                 
                 // Nếu đang chỉnh sửa từ chế độ xem lớp, quay lại chế độ bài tập của lớp đó
                 if (state.ui.viewClassId) {
-                    // Cần reset viewAssignmentId cục bộ
-                    state.ui.viewAssignmentId = null;
+                    viewAssignmentDetails(null);
                     setViewClassMode('assignments');
                 } else {
                     viewAssignmentDetails(null); 
@@ -3443,7 +2654,7 @@
             const confirmModal = document.createElement('div');
             confirmModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
             confirmModal.innerHTML = `
-                <div class="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full text-center mx-4">
+                <div class="bg-white p-6 rounded-xl shadow-2xl max-w-sm w-full text-center">
                     <p class="font-bold text-lg mb-4 text-slate-800">Xác nhận xóa bài tập</p>
                     <p class="text-slate-600 mb-6">Bạn có chắc muốn xóa bài tập "${title}"? Thao tác này không thể hoàn tác.</p>
                     <div class="flex justify-around gap-4">
@@ -3614,114 +2825,7 @@
             }
         };
 
-        // General Auth Handlers
-        window.setAuthMode = (m) => { state.ui.authMode = m; renderApp(); };
-        window.changeView = (v) => { 
-            state.view = v; 
-            // Reset tất cả chế độ xem/tạo/làm bài/thống kê
-            state.ui.isCreatingAssignment = false;
-            state.ui.takingAssignmentId = null;
-            state.ui.viewAssignmentId = null;
-            state.ui.viewSubmission = null;
-            state.ui.isSelectingBankQuestions = false; 
-            state.ui.bankMode = 'list'; 
-            state.ui.selectedBankId = null;
-            state.ui.viewClassId = null;
-            state.ui.isCreatingClass = false;
-            state.ui.isManagingStudent = false;
-            state.ui.viewClassMode = 'students'; // Reset Class mode
-            state.ui.isImportingBankData = false; // Reset Import Data modal
-            state.ui.isAvatarModalOpen = false; // MỚI: Reset Avatar modal
-            state.ui.isMobileSidebarOpen = false; // QUAN TRỌNG: Đóng sidebar mobile khi chuyển view
-
-            if(v!=='competition') { state.ui.competitionMode='lobby'; state.ui.activeMatch=null; }
-            if(v==='competition') loadVocabulary();
-            renderApp(); 
-        };
-        window.setCompetitionMode = (m) => { state.ui.competitionMode = m; renderApp(); };
-        window.handleLogin = async (e) => { e.preventDefault(); const email=document.getElementById('login-email').value; const pass=document.getElementById('login-password').value; await signInWithEmailAndPassword(auth,email,pass).catch(e=>showToast("Lỗi đăng nhập: Vui lòng kiểm tra Email/Mật khẩu.",'error')); };
-        window.handleRegister = async (e) => { 
-            e.preventDefault(); 
-            const email=document.getElementById('join-email').value; 
-            const pass=document.getElementById('join-password').value; 
-            const name=document.getElementById('join-name').value;
-            const role = document.querySelector('input[name="role"]:checked').value;
-            
-            const classCode = role === 'student' ? document.getElementById('class-code-input').value.trim().toUpperCase() : null;
-
-            if (role === 'teacher' && document.getElementById('teacher-code').value !== TEACHER_CODE) return showToast("Sai mã giáo viên", "error");
-
-            try {
-                const cred = await createUserWithEmailAndPassword(auth,email,pass);
-                const uid = cred.user.uid;
-
-                let classIdToJoin = null;
-                let classTitle = '';
-
-                if (role === 'student' && classCode) {
-                    const classSnap = await getDocs(query(getRef('classes'), where('classCode', '==', classCode)));
-                    if (!classSnap.empty) {
-                        const classDoc = classSnap.docs[0];
-                        classIdToJoin = classDoc.id;
-                        classTitle = classDoc.data().title;
-                    } else {
-                        showToast("Mã lớp không tồn tại. Tiếp tục đăng ký mà không vào lớp.", "error");
-                    }
-                }
-
-                await setDoc(doc(db,getPath('users'),uid),{
-                    uid: uid,
-                    name: name,
-                    role: role,
-                    points: 0,
-                    email: email,
-                    // THÊM: Avatar mặc định
-                    avatarUrl: null, 
-                    avatarType: null,
-                    createdAt: serverTimestamp()
-                });
-                
-                if (classIdToJoin) {
-                    await updateDoc(doc(db, getPath('classes'), classIdToJoin), {
-                        studentIds: arrayUnion(uid)
-                    });
-                    showToast(`Đăng ký thành công! Bạn đã tham gia lớp "${classTitle}"`, "success");
-                } else {
-                    showToast("Đăng ký thành công!", "success");
-                }
-
-            } catch(e) { 
-                showToast(`Lỗi đăng ký: ${e.code ? e.code.replace('auth/', '') : e.message}`, 'error'); 
-            }
-        };
-        window.handleSignOut = async () => { await signOut(auth); window.location.reload(); };
-
-        // Competition Handlers
-        window.createMatch = async () => {
-            if(state.data.vocabulary.length<4) await loadVocabulary();
-            const questions = generateArenaQuestions();
-            if (questions.length === 0) return;
-            const roomCode = generateRoomCode();
-            await addDoc(getRef('matches'), { roomCode, player1:{uid:state.user.uid,name:state.profile.name,score:0}, player2:null, status:'waiting', questions, qIndex: 0, createdAt: serverTimestamp() });
-            state.ui.competitionMode='waiting'; showToast(`Tạo phòng ${roomCode}`);
-        };
-
-        window.joinMatch = async () => {
-            const code = document.getElementById('room-code-input').value.trim().toUpperCase();
-            if (code.length !== 6) return showToast("Mã phòng không hợp lệ", "error");
-            const snap = await getDocs(query(getRef('matches'), where('roomCode','==',code), where('status','==','waiting')));
-            if(snap.empty) return showToast("Phòng không tồn tại hoặc đã đầy", "error");
-            const docRef = snap.docs[0];
-            if(docRef.data().player1.uid===state.user.uid) return showToast("Bạn đã ở trong phòng này");
-            await updateDoc(doc(db,getPath('matches'),docRef.id), { player2:{uid:state.user.uid,name:state.profile.name,score:0} });
-            state.ui.competitionMode='waiting'; showToast("Đã tham gia phòng!");
-        };
-
-        window.startMatch = async (mid) => updateDoc(doc(db,getPath('matches'),mid), {status:'playing', startTime: serverTimestamp()});
-        window.leaveMatch = async (mid) => { deleteDoc(doc(db,getPath('matches'),mid)); state.ui.activeMatch=null; state.ui.competitionMode='lobby'; renderApp(); };
-
-
-        // --- CÁC HÀM ĐIỀU HƯỚNG BÀI LÀM (FIX SCROLL JUMP) ---
+        // --- CÁC HÀM ĐIỀU HƯỚNG BÀI LÀM (Giữ nguyên) ---
         window.goToNextQuestion = () => {
             const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
             if (!assign) return;
@@ -3729,19 +2833,16 @@
             const totalQuestions = assign.questions.length;
             if (state.ui.currentQuestionIndex < totalQuestions - 1) {
                 state.ui.currentQuestionIndex++;
-                // Cập nhật UI cục bộ
-                updateAssignmentQuestionUI(assign, state.ui.currentQuestionIndex);
+                renderApp();
+                setTimeout(renderIcons, 0); 
             }
         };
 
         window.goToPreviousQuestion = () => {
-            const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
-            if (!assign) return;
-
             if (state.ui.currentQuestionIndex > 0) {
                 state.ui.currentQuestionIndex--;
-                // Cập nhật UI cục bộ
-                updateAssignmentQuestionUI(assign, state.ui.currentQuestionIndex);
+                renderApp();
+                setTimeout(renderIcons, 0); 
             }
         };
         // -----------------------------
@@ -3774,13 +2875,7 @@
                     });
 
                     state.ui.viewSubmission = {
-                        id: subId,
-                        assignmentId: assign.id,
-                        studentId: state.user.uid,
-                        score: sub.score,
-                        answers: sub.answers,
-                        questionData: sub.questionData, 
-                        createdAt: sub.createdAt,
+                        ...sub,
                         assignment: { ...assign, questions: questionsForReview }
                     };
 
@@ -3796,46 +2891,12 @@
         }
 
 
-        // FIX SCROLL JUMP: Cập nhật UI cục bộ
-        window.selectAnswer = (qIdx, oIdx) => { 
-            state.ui.assignmentAnswers[qIdx] = oIdx; 
-            
-            const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
-            if (assign) {
-                document.getElementById('assignment-question-content').innerHTML = renderTakeAssignmentQuestion(assign.questions[qIdx], qIdx);
-                renderIcons();
-            }
-        };
-        
+        window.selectAnswer = (qIdx, oIdx) => { state.ui.assignmentAnswers[qIdx] = oIdx; renderApp(); };
         window.captureInputAnswer = (qIdx, value) => { state.ui.assignmentAnswers[qIdx] = value; };
         window.getJumbleAnswer = (qIdx) => { return state.ui.assignmentAnswers[qIdx] || []; };
+        window.addJumbleWord = (qIdx, word) => { const currentOrder = window.getJumbleAnswer(qIdx); state.ui.assignmentAnswers[qIdx] = [...currentOrder, word]; renderApp(); };
+        window.removeJumbleWord = (qIdx, wordToRemove, wIdx) => { const currentOrder = window.getJumbleAnswer(qIdx); currentOrder.splice(wIdx, 1); state.ui.assignmentAnswers[qIdx] = currentOrder; renderApp(); };
         
-        // FIX SCROLL JUMP: Cập nhật UI cục bộ
-        window.addJumbleWord = (qIdx, word) => { 
-            const currentOrder = window.getJumbleAnswer(qIdx); 
-            state.ui.assignmentAnswers[qIdx] = [...currentOrder, word]; 
-            
-            const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
-            if (assign) {
-                document.getElementById('assignment-question-content').innerHTML = renderTakeAssignmentQuestion(assign.questions[qIdx], qIdx);
-                renderIcons();
-            }
-        };
-        
-        // FIX SCROLL JUMP: Cập nhật UI cục bộ
-        window.removeJumbleWord = (qIdx, wordToRemove, wIdx) => { 
-            const currentOrder = window.getJumbleAnswer(qIdx); 
-            currentOrder.splice(wIdx, 1); 
-            state.ui.assignmentAnswers[qIdx] = currentOrder; 
-            
-            const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
-            if (assign) {
-                document.getElementById('assignment-question-content').innerHTML = renderTakeAssignmentQuestion(assign.questions[qIdx], qIdx);
-                renderIcons();
-            }
-        };
-        
-        // FIX SCROLL JUMP: Cập nhật UI cục bộ
         window.selectMatchAnswer = (qIdx, aIdx, bIdxValue) => {
             const currentMatches = state.ui.assignmentAnswers[qIdx] || {};
             
@@ -3847,14 +2908,8 @@
                 currentMatches[aIdx] = bIdx;
             }
             state.ui.assignmentAnswers[qIdx] = {...currentMatches};
-            
-            const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
-            if (assign) {
-                document.getElementById('assignment-question-content').innerHTML = renderTakeAssignmentQuestion(assign.questions[qIdx], qIdx);
-                renderIcons();
-            }
+            renderApp();
         };
-
 
         window.submitAssignment = async () => {
             const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
@@ -3951,6 +3006,107 @@
                 showToast("Lỗi nộp bài", "error"); 
             }
         };
+
+        // General Auth Handlers
+        window.setAuthMode = (m) => { state.ui.authMode = m; renderApp(); };
+        window.changeView = (v) => { 
+            state.view = v; 
+            // Reset tất cả chế độ xem/tạo/làm bài/thống kê
+            state.ui.isCreatingAssignment = false;
+            state.ui.takingAssignmentId = null;
+            state.ui.viewAssignmentId = null;
+            state.ui.viewSubmission = null;
+            state.ui.isSelectingBankQuestions = false; 
+            state.ui.bankMode = 'list'; 
+            state.ui.selectedBankId = null;
+            state.ui.viewClassId = null;
+            state.ui.isCreatingClass = false;
+            state.ui.isManagingStudent = false;
+            state.ui.viewClassMode = 'students'; // Reset Class mode
+
+            if(v!=='competition') { state.ui.competitionMode='lobby'; state.ui.activeMatch=null; }
+            if(v==='competition') loadVocabulary();
+            renderApp(); 
+        };
+        window.setCompetitionMode = (m) => { state.ui.competitionMode = m; renderApp(); };
+        window.handleLogin = async (e) => { e.preventDefault(); const email=document.getElementById('login-email').value; const pass=document.getElementById('login-password').value; await signInWithEmailAndPassword(auth,email,pass).catch(e=>showToast("Lỗi đăng nhập: Vui lòng kiểm tra Email/Mật khẩu.",'error')); };
+        window.handleRegister = async (e) => { 
+            e.preventDefault(); 
+            const email=document.getElementById('join-email').value; 
+            const pass=document.getElementById('join-password').value; 
+            const name=document.getElementById('join-name').value;
+            const role = document.querySelector('input[name="role"]:checked').value;
+            
+            const classCode = role === 'student' ? document.getElementById('class-code-input').value.trim().toUpperCase() : null;
+
+            if (role === 'teacher' && document.getElementById('teacher-code').value !== TEACHER_CODE) return showToast("Sai mã giáo viên", "error");
+
+            try {
+                const cred = await createUserWithEmailAndPassword(auth,email,pass);
+                const uid = cred.user.uid;
+
+                let classIdToJoin = null;
+                let classTitle = '';
+
+                if (role === 'student' && classCode) {
+                    const classSnap = await getDocs(query(getRef('classes'), where('classCode', '==', classCode)));
+                    if (!classSnap.empty) {
+                        const classDoc = classSnap.docs[0];
+                        classIdToJoin = classDoc.id;
+                        classTitle = classDoc.data().title;
+                    } else {
+                        showToast("Mã lớp không tồn tại. Tiếp tục đăng ký mà không vào lớp.", "error");
+                    }
+                }
+
+                await setDoc(doc(db,getPath('users'),uid),{
+                    uid: uid,
+                    name: name,
+                    role: role,
+                    points: 0,
+                    email: email,
+                    createdAt: serverTimestamp()
+                });
+                
+                if (classIdToJoin) {
+                    await updateDoc(doc(db, getPath('classes'), classIdToJoin), {
+                        studentIds: arrayUnion(uid)
+                    });
+                    showToast(`Đăng ký thành công! Bạn đã tham gia lớp "${classTitle}"`, "success");
+                } else {
+                    showToast("Đăng ký thành công!", "success");
+                }
+
+            } catch(e) { 
+                showToast(`Lỗi đăng ký: ${e.code ? e.code.replace('auth/', '') : e.message}`, 'error'); 
+            }
+        };
+        window.handleSignOut = async () => { await signOut(auth); window.location.reload(); };
+
+        // Competition Handlers
+        window.createMatch = async () => {
+            if(state.data.vocabulary.length<4) await loadVocabulary();
+            const questions = generateArenaQuestions();
+            if (questions.length === 0) return;
+            const roomCode = generateRoomCode();
+            await addDoc(getRef('matches'), { roomCode, player1:{uid:state.user.uid,name:state.profile.name,score:0}, player2:null, status:'waiting', questions, qIndex: 0, createdAt: serverTimestamp() });
+            state.ui.competitionMode='waiting'; showToast(`Tạo phòng ${roomCode}`);
+        };
+
+        window.joinMatch = async () => {
+            const code = document.getElementById('room-code-input').value.trim().toUpperCase();
+            if (code.length !== 6) return showToast("Mã phòng không hợp lệ", "error");
+            const snap = await getDocs(query(getRef('matches'), where('roomCode','==',code), where('status','==','waiting')));
+            if(snap.empty) return showToast("Phòng không tồn tại hoặc đã đầy", "error");
+            const docRef = snap.docs[0];
+            if(docRef.data().player1.uid===state.user.uid) return showToast("Bạn đã ở trong phòng này");
+            await updateDoc(doc(db,getPath('matches'),docRef.id), { player2:{uid:state.user.uid,name:state.profile.name,score:0} });
+            state.ui.competitionMode='waiting'; showToast("Đã tham gia phòng!");
+        };
+
+        window.startMatch = async (mid) => updateDoc(doc(db,getPath('matches'),mid), {status:'playing', startTime: serverTimestamp()});
+        window.leaveMatch = async (mid) => { deleteDoc(doc(db,getPath('matches'),mid)); state.ui.activeMatch=null; state.ui.competitionMode='lobby'; renderApp(); };
+
 
         // Bootstrap
         onAuthStateChanged(auth, (u) => {

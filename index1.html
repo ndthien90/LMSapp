@@ -7,14 +7,6 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
-        /* FIX QUAN TRỌNG CHO MOBILE VÀ KEYBOARD: 
-           Đảm bảo html/body cố định chiều cao viewport để bàn phím ảo không làm rung lắc giao diện chính.
-        */
-        html, body {
-            height: 100vh; /* Cố định chiều cao theo viewport */
-            overflow: hidden; /* Ngăn cuộn tổng thể */
-        }
-        
         /* Custom scrollbar for better look */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
@@ -98,7 +90,7 @@
         }
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900 font-sans h-full w-full overflow-hidden">
+<body class="bg-slate-50 text-slate-900 font-sans h-screen overflow-hidden">
 
     <div id="app" class="h-full w-full"></div>
 
@@ -2355,6 +2347,18 @@
             }
 
             renderIcons();
+if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(currentQ.type)) {
+                const inputId = `input-q-${qIndex}`;
+                // Sử dụng setTimeout để đảm bảo DOM đã render xong trước khi focus
+                setTimeout(() => {
+                    const inputEl = document.getElementById(inputId);
+                    if (inputEl) {
+                        inputEl.focus();
+                        // Thêm scrollIntoView để đảm bảo input không bị bàn phím che mất
+                        inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    }
+                }, 100); 
+            }
         };
 
 
@@ -2380,7 +2384,16 @@
             const isLast = qIndex === totalQuestions - 1;
 
             const questionHtml = renderTakeAssignmentQuestion(currentQ, qIndex);
-
+if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(currentQ.type)) {
+                const inputId = `input-q-${qIndex}`;
+                // Sử dụng setTimeout ngắn để DOM render xong rồi mới focus
+                setTimeout(() => {
+                    const inputEl = document.getElementById(inputId);
+                    if (inputEl) {
+                        inputEl.focus();
+                    }
+                }, 100); 
+            }
             return `
                 <div class="max-w-3xl mx-auto bg-white p-4 md:p-8 rounded-2xl shadow-lg fade-in">
                     <div class="flex justify-between items-center mb-6 pb-4 border-b">
@@ -2542,9 +2555,9 @@
                         <i data-lucide="trophy" class="w-10 h-10 md:w-12 md:h-12 mx-auto drop-shadow-lg mb-2"></i>
                         <h3 class="text-2xl md:text-3xl font-bold">Bảng Xếp Hạng Điểm</h3>
                     </div>
-                    <div class="p-4 md:p-6">
+                    <div class="p-1 md:p-1">
                         <div class="overflow-x-auto">
-                            <table class="w-full min-w-[500px]">
+                            <table class="w-full min-w-[200px]">
                                 <thead>
                                     <tr class="text-left text-slate-500 text-sm border-b bg-slate-50">
                                         <th class="pb-3 pl-4 pt-3 w-16">Hạng</th>
@@ -2561,7 +2574,8 @@
                                                 ${renderMedal(idx+1)}
                                             </td>
                                             <td class="py-3 md:py-4 flex items-center gap-3">
-                                                ${renderAvatar(u, 'w-10 h-10', 'text-base')}
+                                                <!--${renderAvatar(u, 'w-6 h-6', 'text-sm')} -->
+                                                ${renderAvatar(u, 'w-6 h-6', 'text-sm')}
                                                 <span class="font-medium ${isMe ? 'text-blue-700' : 'text-slate-700'} truncate">${u.name} ${isMe ? '(Bạn)' : ''}</span>
                                             </td>
                                             <td class="py-3 md:py-4 text-right pr-4 font-bold text-lg md:text-xl text-yellow-600">${u.points || 0}</td>
@@ -4109,10 +4123,6 @@
 
         // --- CÁC HÀM ĐIỀU HƯỚNG BÀI LÀM (FIX SCROLL JUMP) ---
         window.goToNextQuestion = () => {
-const currentInput = document.getElementById(`input-q-${state.ui.currentQuestionIndex}`);
-if (currentInput) {
-    state.ui.assignmentAnswers[state.ui.currentQuestionIndex] = currentInput.value;
-}
             const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
             if (!assign) return;
 
@@ -4197,8 +4207,7 @@ if (currentInput) {
             }
         };
         
-        // Không làm gì cả khi gõ phím. Giá trị sẽ được đọc khi người dùng chuyển câu/nộp bài.
-       window.captureInputAnswer = (qIdx, value) => {};
+        window.captureInputAnswer = (qIdx, value) => { state.ui.assignmentAnswers[qIdx] = value; };
         window.getJumbleAnswer = (qIdx) => { return state.ui.assignmentAnswers[qIdx] || []; };
         
         // FIX SCROLL JUMP: Cập nhật UI cục bộ
@@ -4249,10 +4258,6 @@ if (currentInput) {
 
         window.submitAssignment = async () => {
             const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
-            const currentInput = document.getElementById(`input-q-${state.ui.currentQuestionIndex}`);
-if (currentInput) {
-    state.ui.assignmentAnswers[state.ui.currentQuestionIndex] = currentInput.value;
-}
             let score = 0;
             const totalQuestions = assign.questions.length;
             const scorePerQuestion = 100 / totalQuestions;

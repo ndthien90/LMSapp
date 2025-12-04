@@ -108,8 +108,7 @@
                  createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, addDoc, updateDoc, onSnapshot, serverTimestamp, query, where, getDocs, deleteDoc, runTransaction, arrayRemove, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js"; // THÊM FIREBASE STORAGE
-/
-/ --- BỔ SUNG: HÀM AUTO FOCUS ĐỂ FIX LỖI NHÁY MÀN HÌNH TRÊN MOBILE ---
+// --- BỔ SUNG: HÀM AUTO FOCUS ĐỂ FIX LỖI NHÁY MÀN HÌNH TRÊN MOBILE ---
 window.autoFocusInput = (qIndex, qType) => {
     // Chỉ xử lý cho các loại câu hỏi nhập liệu
     if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(qType)) {
@@ -2396,7 +2395,7 @@ window.autoFocusInput(qIndex, currentQ.type);
             const isLast = qIndex === totalQuestions - 1;
 
             const questionHtml = renderTakeAssignmentQuestion(currentQ, qIndex);
-window.autoFocusInput(qIndex, currentQ.type);
+            window.autoFocusInput(qIndex, currentQ.type);
             return `
                 <div class="max-w-3xl mx-auto bg-white p-4 md:p-8 rounded-2xl shadow-lg fade-in">
                     <div class="flex justify-between items-center mb-6 pb-4 border-b">

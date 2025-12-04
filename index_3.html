@@ -235,27 +235,16 @@
             }
         }
         
-// --- SỬA LỖI NHÁY MÀN HÌNH KHI NHẬP LIỆU MOBILE ---
-let lastWidth = window.innerWidth; // Lưu lại chiều rộng ban đầu
-
-window.addEventListener('resize', () => {
-    const currentWidth = window.innerWidth;
-
-    // QUAN TRỌNG: Nếu chiều rộng không đổi (chỉ đổi chiều cao do bàn phím hiện), thì KHÔNG làm gì cả.
-    if (currentWidth === lastWidth) return;
-    
-    // Cập nhật lại chiều rộng mới
-    lastWidth = currentWidth;
-
-    const isDesktop = currentWidth >= 1024;
-    if (isDesktop && !state.ui.isSidebarOpen) {
-        state.ui.isSidebarOpen = true; 
-    } else if (!isDesktop && state.ui.isSidebarCollapsed) {
-        state.ui.isSidebarCollapsed = false; 
-    }
-    
-    if (state.user && state.profile) renderApp();
-});
+        // Khởi tạo trạng thái sidebar khi load
+        window.addEventListener('resize', () => {
+            const isDesktop = window.innerWidth >= 1024;
+            if (isDesktop && !state.ui.isSidebarOpen) {
+                state.ui.isSidebarOpen = true; 
+            } else if (!isDesktop && state.ui.isSidebarCollapsed) {
+                state.ui.isSidebarCollapsed = false; // Luôn mở full trên mobile nếu không bị collapse trước đó
+            }
+             if (state.user && state.profile) renderApp(); // Render lại để áp dụng CSS classes
+        });
 
 
         // --- 3. UTILITIES & DATA LOADING ---

@@ -108,28 +108,6 @@
                  createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, addDoc, updateDoc, onSnapshot, serverTimestamp, query, where, getDocs, deleteDoc, runTransaction, arrayRemove, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js"; // THÊM FIREBASE STORAGE
-// --- BỔ SUNG: HÀM AUTO FOCUS ĐỂ FIX LỖI NHÁY MÀN HÌNH TRÊN MOBILE ---
-window.autoFocusInput = (qIndex, qType) => {
-    // Chỉ xử lý cho các loại câu hỏi nhập liệu
-    if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(qType)) {
-        const inputId = `input-q-${qIndex}`;
-        
-        // **Quan trọng:** Tăng độ trễ lên 200ms để chờ bàn phím ảo ổn định
-        setTimeout(() => {
-            const inputEl = document.getElementById(inputId);
-            if (inputEl) {
-                // Focus vào ô nhập liệu
-                inputEl.focus();
-                // Cuộn ô nhập liệu vào giữa màn hình, tránh bị bàn phím che
-                inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            }
-        }, 200); 
-    }
-};
-
-
-
-
 
         // --- 1. CONFIGURATION ---
         let appId, firebaseConfig;
@@ -257,16 +235,27 @@ window.autoFocusInput = (qIndex, qType) => {
             }
         }
         
-        // Khởi tạo trạng thái sidebar khi load
-        window.addEventListener('resize', () => {
-            const isDesktop = window.innerWidth >= 1024;
-            if (isDesktop && !state.ui.isSidebarOpen) {
-                state.ui.isSidebarOpen = true; 
-            } else if (!isDesktop && state.ui.isSidebarCollapsed) {
-                state.ui.isSidebarCollapsed = false; // Luôn mở full trên mobile nếu không bị collapse trước đó
-            }
-             if (state.user && state.profile) renderApp(); // Render lại để áp dụng CSS classes
-        });
+// --- SỬA LỖI NHÁY MÀN HÌNH KHI NHẬP LIỆU MOBILE ---
+let lastWidth = window.innerWidth; // Lưu lại chiều rộng ban đầu
+
+window.addEventListener('resize', () => {
+    const currentWidth = window.innerWidth;
+
+    // QUAN TRỌNG: Nếu chiều rộng không đổi (chỉ đổi chiều cao do bàn phím hiện), thì KHÔNG làm gì cả.
+    if (currentWidth === lastWidth) return;
+    
+    // Cập nhật lại chiều rộng mới
+    lastWidth = currentWidth;
+
+    const isDesktop = currentWidth >= 1024;
+    if (isDesktop && !state.ui.isSidebarOpen) {
+        state.ui.isSidebarOpen = true; 
+    } else if (!isDesktop && state.ui.isSidebarCollapsed) {
+        state.ui.isSidebarCollapsed = false; 
+    }
+    
+    if (state.user && state.profile) renderApp();
+});
 
 
         // --- 3. UTILITIES & DATA LOADING ---
@@ -2369,7 +2358,6 @@ window.autoFocusInput = (qIndex, qType) => {
             }
 
             renderIcons();
-window.autoFocusInput(qIndex, currentQ.type);
         };
 
 
@@ -2395,7 +2383,7 @@ window.autoFocusInput(qIndex, currentQ.type);
             const isLast = qIndex === totalQuestions - 1;
 
             const questionHtml = renderTakeAssignmentQuestion(currentQ, qIndex);
-            window.autoFocusInput(qIndex, currentQ.type);
+
             return `
                 <div class="max-w-3xl mx-auto bg-white p-4 md:p-8 rounded-2xl shadow-lg fade-in">
                     <div class="flex justify-between items-center mb-6 pb-4 border-b">

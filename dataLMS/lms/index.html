@@ -1,0 +1,72 @@
+
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="https://lucide.dev/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>EduBattle - Nền tảng học tập & Thi đấu</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+      body { font-family: 'Inter', sans-serif; }
+      
+      /* Custom scrollbar */
+      ::-webkit-scrollbar { width: 8px; }
+      ::-webkit-scrollbar-track { background: #f1f5f9; }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+      ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+      
+      /* Animations */
+      .fade-in { animation: fadeIn 0.3s ease-in-out; }
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      
+      .flash-green { animation: flashGreen 0.2s ease-out; }
+      @keyframes flashGreen {
+          0% { background-color: #f0fff4; }
+          50% { background-color: #34d399; }
+          100% { background-color: #f0fff4; }
+      }
+
+      /* Jumble Word Styling */
+      .jumble-word {
+          display: inline-block;
+          padding: 8px 12px;
+          margin: 4px;
+          background-color: #e0f2f1; /* Tailwind teal-50 */
+          border: 1px solid #009688; /* Tailwind teal-600 */
+          border-radius: 6px;
+          cursor: pointer;
+          transition: background-color 0.2s;
+          font-weight: 600;
+          color: #0f766e;
+      }
+      .jumble-word:hover { background-color: #b2dfdb; }
+      
+      /* Mobile Sidebar & Layout Fixes */
+      @media (max-width: 1023px) {
+        main {
+            padding-bottom: calc(1rem + 64px) !important; /* Spacing for bottom nav */
+        }
+      }
+    </style>
+<script type="importmap">
+{
+  "imports": {
+    "react": "https://aistudiocdn.com/react@^19.2.0",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "firebase/": "https://aistudiocdn.com/firebase@^12.6.0/",
+    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.10.0",
+    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
+    "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.1/package/xlsx.mjs"
+  }
+}
+</script>
+<link rel="stylesheet" href="/index.css">
+</head>
+  <body class="bg-slate-50 text-slate-900 h-screen overflow-hidden">
+    <div id="root" class="h-full w-full"></div>
+  <script type="module" src="/index.tsx"></script>
+</body>
+</html>

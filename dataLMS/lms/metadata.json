@@ -1,0 +1,7 @@
+{
+  "name": "Lms thien90",
+  "description": "A comprehensive LMS and competitive learning platform featuring class management, assignments, question banks, and real-time vocabulary battles.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

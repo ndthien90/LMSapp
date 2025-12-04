@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xuất Danh Sách Học Sinh</title>
+    <!-- Tải Tailwind CSS để tạo giao diện đẹp và đáp ứng -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Thiết lập font chữ chính cho ứng dụng */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #e5e7eb; /* Màu nền xám nhạt hơn */
+        }
+        /* Tùy chỉnh màu sắc và hiệu ứng cho giao diện */
+        .card {
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.05);
+        }
+        .btn-primary {
+            transition: all 0.2s ease-in-out;
+        }
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.4); /* Màu xanh đậm hơn */
+        }
+        .input-field:focus {
+            outline: none;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.5);
+            border-color: #3b82f6;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="w-full max-w-md bg-white card rounded-2xl p-6 md:p-8 space-y-6">
+        <h1 class="text-2xl font-bold text-center text-gray-800 border-b pb-3">
+            XUẤT DỮ LIỆU HỌC SINH
+        </h1>
+        
+        <!-- Form nhập liệu -->
+        <div class="space-y-4">
+            <!-- Mã Lớp (Short Code) -->
+            <div>
+                <label for="classCode" class="block text-sm font-semibold text-gray-700 mb-1">Mã Lớp</label>
+                <input type="text" id="classCode" name="classCode" placeholder="Nhập mã lớp..."
+                       class="input-field mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm transition duration-150"
+                       required>
+            </div>
+            
+            <!-- Tên Lớp (Descriptive Name) -->
+            <div>
+                <label for="className" class="block text-sm font-semibold text-gray-700 mb-1">Tên Lớp</label>
+                <input type="text" id="className" name="className" placeholder="Nhập tên lớp đầy đủ..."
+                       class="input-field mt-1 block w-full px-4 py-2 border border-gray-300 rounded-lg shadow-sm transition duration-150"
+                       required>
+            </div>
+
+            <!-- Danh sách Tên Học Sinh -->
+            <div>
+                <label for="studentNames" class="block text-sm font-semibold text-gray-700 mb-1">Danh sách Học Sinh </label>
+                <textarea id="studentNames" name="studentNames" rows="8" placeholder="Nguyễn Văn A
+Trần Thị B
+Lê Thị C
+"
+                       class="input-field mt-1 block w-full px-4 py-3 border border-gray-300 rounded-lg shadow-sm transition duration-150"
+                       required></textarea>
+                <p class="text-xs text-gray-500 mt-1">
+                    *Hậu tố Email sẽ được lấy từ trường Tên Lớp bên trên.
+                </p>
+                <p id="emailPreview" class="text-xs text-blue-500 italic mt-1"></p>
+            </div>
+        </div>
+
+        <!-- Nút xuất file -->
+        <button id="exportButton" class="btn-primary w-full flex justify-center py-3 px-4 border border-transparent rounded-lg shadow-lg text-base font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-4 focus:ring-blue-300 transition duration-200 ease-in-out">
+            <svg class="w-5 h-5 mr-2 -ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            XUẤT FILE CSV
+        </button>
+
+        <!-- Khu vực hiển thị thông báo -->
+        <div id="messageBox" class="text-sm text-center py-2 hidden rounded-lg" role="alert"></div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const classCodeInput = document.getElementById('classCode');
+            const classNameInput = document.getElementById('className');
+            const studentNamesTextarea = document.getElementById('studentNames');
+            const exportButton = document.getElementById('exportButton');
+            const messageBox = document.getElementById('messageBox');
+            const emailPreview = document.getElementById('emailPreview');
+
+            // Hàm chuẩn hóa tên thành định dạng email: loại bỏ dấu và ký tự đặc biệt, nối liền
+            function slugifyName(text) {
+                // 1. Chuyển thành chữ thường
+                let slug = text.toLowerCase();
+
+                // 2. Loại bỏ dấu (tiếng Việt)
+                slug = slug.replace(/á|à|ả|ã|ạ|ă|ắ|ằ|ẳ|ẵ|ặ|â|ấ|ầ|ẩ|ẫ|ậ/g, 'a');
+                slug = slug.replace(/é|è|ẻ|ẽ|ẹ|ê|ế|ề|ể|ễ|ệ/g, 'e');
+                slug = slug.replace(/í|ì|ỉ|ĩ|ị/g, 'i');
+                slug = slug.replace(/ó|ò|ỏ|õ|ọ|ô|ố|ồ|ổ|ỗ|ộ|ơ|ớ|ờ|ở|ỡ|ợ/g, 'o');
+                slug = slug.replace(/ú|ù|ủ|ũ|ụ|ư|ứ|ừ|ử|ữ|ự/g, 'u');
+                slug = slug.replace(/ý|ỳ|ỷ|ỹ|ỵ/g, 'y');
+                slug = slug.replace(/đ/g, 'd');
+
+                // 3. Thay thế khoảng trắng và các ký tự không phải chữ/số bằng chuỗi rỗng
+                slug = slug.replace(/[^a-z0-9]/g, ''); 
+                
+                return slug;
+            }
+            
+            // Hàm cập nhật xem trước email
+            function updatePreview() {
+                const mainClassName = classNameInput.value.trim(); // Lấy Tên Lớp
+                const studentNames = studentNamesTextarea.value.trim().split('\n').filter(n => n.length > 0);
+                
+                if (studentNames.length > 0 && mainClassName) {
+                    const sampleName = studentNames[0].trim();
+                    const nameSlug = slugifyName(sampleName);
+                    const classSlug = slugifyName(mainClassName); // Chuẩn hóa Tên Lớp
+                    const sampleEmail = `${nameSlug}_${classSlug}@gmail.com`;
+                    
+                    emailPreview.textContent = `Ví dụ email: ${sampleEmail}`;
+                } else {
+                    emailPreview.textContent = '';
+                }
+            }
+
+            classCodeInput.addEventListener('input', updatePreview);
+            classNameInput.addEventListener('input', updatePreview);
+            studentNamesTextarea.addEventListener('input', updatePreview);
+
+
+            // Hàm tạo và tải file CSV
+            function generateCSV(data, mainClassCode) {
+                if (data.length === 0) {
+                    showMessage("Vui lòng nhập danh sách tên học sinh.", 'bg-yellow-100 text-yellow-800');
+                    return;
+                }
+                
+                // Tiêu đề cột (Chỉ để tham khảo, không dùng trong CSV)
+                // const headers = ["Tên học sinh", "Email", "Mật khẩu", "Mã lớp", "Tên Lớp"];
+                
+                // Chuyển đổi dữ liệu thành mảng các dòng CSV
+                const csvRows = [];
+                // *** BỎ DÒNG TIÊU ĐỀ KHỎI CSV ***
+                // csvRows.push(headers.map(h => `"${h}"`).join(',')); 
+
+                data.forEach(student => {
+                    // Dữ liệu phải được sắp xếp theo thứ tự: Tên HS, Email, Mật khẩu, Mã lớp, Tên lớp
+                    const row = [
+                        `"${student.name}"`, 
+                        `"${student.email}"`, 
+                        `"${student.password}"`, 
+                        `"${student.classCode}"`, 
+                        `"${student.className}"` 
+                    ];
+                    csvRows.push(row.join(','));
+                });
+
+                // Kết hợp các dòng thành chuỗi CSV (sử dụng dấu xuống dòng)
+                const csvString = csvRows.join('\n');
+
+                // Tạo Blob (Binary Large Object) cho file CSV với BOM để hỗ trợ tiếng Việt trong Excel
+                const bom = '\ufeff'; 
+                const blob = new Blob([bom + csvString], { type: 'text/csv;charset=utf-8;' });
+                
+                // Tạo liên kết tải xuống
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(blob);
+                link.download = `Danh_Sach_Hoc_Sinh_${mainClassCode}_${new Date().toISOString().slice(0, 10)}.csv`;
+                
+                // Tự động click để tải xuống
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                
+                showMessage("Đã xuất file thành công! Vui lòng kiểm tra thư mục Tải xuống.", 'bg-green-100 text-green-800');
+            }
+            
+            // Hàm hiển thị thông báo
+            function showMessage(message, styleClass) {
+                messageBox.textContent = message;
+                messageBox.className = `text-sm text-center py-2 px-3 rounded-lg ${styleClass}`;
+                messageBox.classList.remove('hidden');
+            }
+
+            // Xử lý sự kiện khi nhấn nút
+            exportButton.addEventListener('click', () => {
+                const mainClassCode = classCodeInput.value.trim().toUpperCase();
+                const className = classNameInput.value.trim(); 
+                const studentNamesInput = studentNamesTextarea.value.trim();
+                
+                if (!mainClassCode) {
+                    showMessage("Vui lòng nhập Mã Lớp (Short Code).", 'bg-red-100 text-red-800');
+                    classCodeInput.focus();
+                    return;
+                }
+                
+                if (!className) {
+                    showMessage("Vui lòng nhập Tên Lớp (Descriptive Name).", 'bg-red-100 text-red-800');
+                    classNameInput.focus();
+                    return;
+                }
+
+                if (!studentNamesInput) {
+                    showMessage("Vui lòng nhập Danh sách Tên Học Sinh.", 'bg-red-100 text-red-800');
+                    studentNamesTextarea.focus();
+                    return;
+                }
+
+                const names = studentNamesInput.split('\n')
+                                                .map(name => name.trim())
+                                                .filter(name => name.length > 0);
+
+                if (names.length === 0) {
+                    showMessage("Danh sách tên không hợp lệ.", 'bg-yellow-100 text-yellow-800');
+                    return;
+                }
+                
+                // Chuẩn hóa Tên Lớp (className) để dùng làm hậu tố email
+                const classNameSlug = slugifyName(className); 
+
+                const studentData = names.map(line => {
+                    const studentName = line.trim();
+                    const nameSlug = slugifyName(studentName);
+
+                    // ĐỊNH DẠNG: tenhocsinh_tenlophienbanrutgon@gmail.com
+                    const email = `${nameSlug}_${classNameSlug}@gmail.com`; 
+                    
+                    return {
+                        name: studentName,
+                        email: email,
+                        password: '123456', 
+                        classCode: mainClassCode, 
+                        className: className 
+                    };
+                });
+                
+                generateCSV(studentData, mainClassCode);
+            });
+            
+            // Khởi tạo và theo dõi sự kiện cho preview
+            updatePreview();
+        });
+    </script>
+</body>
+</html>

@@ -727,10 +727,7 @@ window.addEventListener('resize', () => {
                 if (overlayEl) {
                     overlayEl.classList.toggle('open', window.innerWidth < 1024 && state.ui.isSidebarOpen);
                 }
-                const headerScoreEl = document.getElementById('header-points');
-                if (headerScoreEl && state.profile) {
-                     headerScoreEl.textContent = state.profile.points;
-                }
+                
                 // Chỉ cập nhật nội dung của MAIN (và modal import data nếu có)
                 updateMainContent();
             }
@@ -851,11 +848,9 @@ window.addEventListener('resize', () => {
                                   state.view === 'question_bank' ? 'Ngân hàng đề' :
                                   state.view === 'competition' ? 'Đấu trường trực tuyến' : 'Bảng xếp hạng'}
                             </h2>
-	        <div class="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-bold flex items-center gap-1.5 ml-auto">
-    		<i data-lucide="trophy" size="14"></i> 
-    		<span class="hidden md:inline">Điểm:</span> 
-    		<span id="header-points">${state.profile.points}</span>
-	        </div>
+                            <div class="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-full text-sm font-bold flex items-center gap-1.5 ml-auto">
+                                <i data-lucide="trophy" size="14"></i> <span class="hidden md:inline">Điểm:</span> ${state.profile.points}
+                            </div>
                         </header>
                         
                         <!-- Main Content -->
@@ -981,7 +976,7 @@ window.addEventListener('resize', () => {
                         <h4 class="text-lg font-bold text-slate-800 mb-1 truncate">${c.title}</h4>
                         <p class="text-slate-500 text-sm mb-4">Giáo viên: ${teacherProfile ? teacherProfile.name : 'Đang cập nhật'}</p>
                         <button onclick="viewMyClassDetails('${c.id}')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition flex items-center justify-center gap-2 text-sm">
-                            <i data-lucide="eye" size="12"></i> Chi tiết
+                            <i data-lucide="eye" size="16"></i> Xem chi tiết
                         </button>
                     </div>
                 `;
@@ -1156,10 +1151,10 @@ window.addEventListener('resize', () => {
                         <p class="text-slate-500 text-sm mb-4">${studentCount} Học sinh</p>
                         <div class="flex gap-2 text-sm">
                             <button onclick="viewClass('${c.id}')" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium transition">
-                                <i data-lucide="eye" size="12" class="inline mr-1"></i> Quản lý
+                                <i data-lucide="eye" size="16" class="inline mr-1"></i> Quản lý
                             </button>
                             <button onclick="confirmDeleteClass('${c.id}', '${c.title}')" class="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition">
-                                <i data-lucide="trash-2" size="12"></i>
+                                <i data-lucide="trash-2" size="18"></i>
                             </button>
                         </div>
                     </div>
@@ -1250,45 +1245,35 @@ window.addEventListener('resize', () => {
                                          completionRate > 0 ? 'bg-yellow-100 text-yellow-700' : 
                                          'bg-red-100 text-red-700';
 
-                return `
-                    <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition flex items-center justify-between gap-3">
-                        <div class="flex items-center gap-3 flex-1 min-w-0">
-                            <div class="bg-blue-50 text-blue-600 p-2 rounded-lg flex-shrink-0">
-                                <i data-lucide="book-open" class="w-5 h-5"></i>
-                            </div>
-                            <div class="min-w-0">
-                                <h4 class="text-sm font-bold text-slate-800 truncate">${a.title}</h4>
-                                <p class="text-xs text-slate-500 mt-0.5">${a.questions.length} câu hỏi</p>
-                            </div>
-                        </div>
 
-                        <div class="flex items-center gap-3 flex-shrink-0">
-                            <span class="px-2 py-1 rounded-full text-xs font-bold ${completionColor} hidden sm:inline-block">
+                return `
+                    <div class="bg-white p-5 rounded-xl shadow-md border border-slate-100 hover:shadow-lg transition">
+                        <div class="flex justify-between items-start mb-3">
+                            <h4 class="text-lg font-bold text-slate-800 truncate">${a.title}</h4>
+                            <span class="px-2 py-0.5 rounded-full text-xs font-bold ${completionColor} flex-shrink-0">
                                 ${submissionsCount}/${studentList.length} (${completionRate}%)
                             </span>
-                            
-                            <div class="flex gap-2">
-                                <button onclick="viewAssignmentDetailsInClass('${a.id}')" class="p-2 bg-yellow-100 text-yellow-700 rounded-lg hover:bg-yellow-200 transition" title="Xem/Sửa">
-                                    <i data-lucide="eye" size="18"></i>
-                                </button>
-                                <button onclick="confirmDeleteAssignment('${a.id}', '${a.title}')" class="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition" title="Xóa">
-                                    <i data-lucide="trash-2" size="18"></i>
-                                </button>
-                            </div>
+                        </div>
+                        <p class="text-slate-500 text-sm mb-4">${a.questions.length} câu hỏi</p>
+                        <div class="flex gap-2 text-sm font-medium">
+                            <button onclick="viewAssignmentDetailsInClass('${a.id}')" class="flex-1 flex items-center justify-center gap-1 bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded-lg transition">
+                                <i data-lucide="eye" size="16"></i> Xem/Sửa
+                            </button>
+                            <button onclick="confirmDeleteAssignment('${a.id}', '${a.title}')" class="flex-1 flex items-center justify-center gap-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg transition">
+                                <i data-lucide="trash-2" size="16"></i> Xóa
+                            </button>
                         </div>
                     </div>
                 `;
             }).join('');
 
-return `
-                <h4 class="text-xl font-bold text-slate-700 mb-4"></h4>
-                
-                <button onclick="createClassAssignment('${classData.id}', '${classData.title}')" class="mb-4 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-xl font-bold shadow-md flex items-center gap-2 text-sm w-fit">
-                    <i data-lucide="plus-circle" size="18"></i> Tạo Bài tập mới
+            return `
+                <h4 class="text-xl font-bold text-slate-700 mb-4">Danh sách Bài tập đã giao</h4>
+                <button onclick="createClassAssignment('${classData.id}', '${classData.title}')" class="mb-6 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 md:px-6 md:py-3 rounded-xl font-bold shadow-md flex items-center gap-2 text-sm md:text-base">
+                    <i data-lucide="plus-circle"></i> Tạo Bài tập mới cho ${classData.title}
                 </button>
-
-                <div class="grid grid-cols-2 lg:grid-cols-3 gap-1">
-                    ${list || `<p class="text-slate-500 text-center col-span-full py-4 bg-slate-50 rounded-xl border border-dashed border-slate-300">Chưa có bài tập nào được giao cho lớp này.</p>`}
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    ${list || `<p class="text-slate-500">Chưa có bài tập nào được giao cho lớp này.</p>`}
                 </div>
             `;
         };
@@ -1377,7 +1362,7 @@ return `
             }
             
             // --- MẶC ĐỊNH: Hiển thị danh sách các bài tập ---
- const assignmentCards = classAssignments.map(a => {
+            const assignmentCards = classAssignments.map(a => {
                 const submissionsCount = state.data.submissions.filter(s => 
                     s.assignmentId === a.id && studentList.some(st => st.uid === s.studentId)
                 ).length;
@@ -1385,39 +1370,32 @@ return `
                 const completionRate = studentList.length > 0 ? 
                     Math.round((submissionsCount / studentList.length) * 100) : 0;
                 
-                const completionColor = completionRate === 100 ? 'bg-green-500' : 
-                                         completionRate > 0 ? 'bg-yellow-500' : 
-                                         'bg-slate-400';
+                const completionColor = completionRate === 100 ? 'bg-green-600' : 
+                                         completionRate > 0 ? 'bg-yellow-600' : 
+                                         'bg-red-600';
+
 
                 return `
                     <button onclick="viewAssignmentStats('${a.id}')" 
-                            class="bg-white p-3 rounded-xl shadow-sm border border-slate-100 hover:shadow-md hover:bg-slate-50 transition flex items-center justify-between gap-3 text-left w-full group">
-                        
-                        <div class="flex items-center gap-3 flex-1 min-w-0">
-                            <div class="bg-indigo-50 text-indigo-600 p-2 rounded-lg flex-shrink-0">
-                                <i data-lucide="bar-chart-3" class="w-5 h-5"></i>
-                            </div>
-                            <div class="min-w-0">
-                                <h4 class="text-sm font-bold text-slate-800 truncate group-hover:text-blue-600 transition">${a.title}</h4>
-                                <p class="text-xs text-slate-500 mt-0.5">${a.questions.length} câu hỏi</p>
-                            </div>
-                        </div>
-
-                        <div class="flex items-center gap-3 flex-shrink-0">
-                             <span class="px-2 py-1 rounded-full text-xs font-bold text-white ${completionColor}">
+                            class="bg-white p-5 rounded-xl shadow-md border border-slate-100 hover:shadow-lg hover:bg-slate-50 transition text-left">
+                        <div class="flex justify-between items-start mb-3">
+                            <h4 class="text-lg font-bold text-slate-800 truncate">${a.title}</h4>
+                            <span class="px-3 py-1 rounded-full text-xs font-bold text-white ${completionColor} flex-shrink-0">
                                 ${completionRate}%
                             </span>
-                            <i data-lucide="chevron-right" class="text-slate-300 w-5 h-5 group-hover:text-blue-500 transition"></i>
                         </div>
+                        <p class="text-slate-500 text-sm mb-4">${a.questions.length} câu hỏi</p>
+                        <p class="text-sm font-medium text-blue-600">
+                             <i data-lucide="bar-chart-3" size="16" class="inline mr-1"></i> Xem thống kê chi tiết
+                        </p>
                     </button>
                 `;
             }).join('');
 
-             return `
+            return `
                 <h4 class="text-xl font-bold text-slate-700 mb-4">Danh sách Bài tập (Chọn để xem thống kê)</h4>
-                
-                <div class="grid grid-cols-2 lg:grid-cols-4 gap-1">
-                    ${assignmentCards || `<p class="text-slate-500 text-center col-span-full py-4 bg-slate-50 rounded-xl border border-dashed border-slate-300">Chưa có bài tập nào được giao để thống kê.</p>`}
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    ${assignmentCards}
                 </div>
             `;
         }
@@ -1515,71 +1493,52 @@ return `
             const isTeacher = state.profile.role === 'teacher';
             const assignmentsList = state.data.assignments;
 
-const list = assignmentsList.map(a => {
-        const sub = state.data.submissions.find(s => s.assignmentId === a.id && s.studentId === state.user.uid);
-        const assignedClasses = (a.classIds || []).map(id => {
-            const cls = state.data.classes.find(c => c.id === id);
-            return cls ? cls.title : 'Lớp đã xóa';
-        }).join(', ');
-        // Xử lý nút bấm: Làm nhỏ gọn lại
-        let actionBtn = '';
-        if (!isTeacher) { // Giao diện Học sinh
-            if (sub) {
-                // Đã làm xong: Hiện điểm số, nút màu xanh nhạt
-                actionBtn = `
-                    <button onclick="viewSubmissionResult('${sub.id}')" 
-                        class="px-3 py-1.5 bg-green-50 text-green-700 border border-green-200 rounded-lg font-bold text-xs whitespace-nowrap hover:bg-green-100 transition">
-                        ${sub.score} điểm
-                    </button>`;
-            } else {
-                // Chưa làm: Nút màu xanh đậm, nổi bật
-                actionBtn = `
-                    <button onclick="startAssignment('${a.id}')" 
-                        class="px-3 py-1.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold text-xs whitespace-nowrap shadow-sm transition">
-                        Làm ngay
-                    </button>`;
-            }
-        } else { 
-            // Giáo viên (giữ nguyên hoặc tối giản nếu muốn)
-            actionBtn = `
-                <div class="flex gap-2">
-                    <button onclick="viewAssignmentDetails('${a.id}')" class="p-1 bg-yellow-100 text-yellow-700 rounded-lg"><i data-lucide="eye" size="12"></i></button>
-                    <button onclick="confirmDeleteAssignment('${a.id}', '${a.title}')" class="p-1 bg-red-100 text-red-700 rounded-lg"><i data-lucide="trash-2" size="12"></i></button>
-                </div>
-            `;
-        }
+            const list = assignmentsList.map(a => {
+                const sub = state.data.submissions.find(s => s.assignmentId === a.id && s.studentId === state.user.uid);
+                
+                const assignedClasses = (a.classIds || []).map(id => 
+                    state.data.classes.find(c => c.id === id)?.title || 'Lớp đã xóa'
+                ).join(', ');
 
-        // HTML MỚI: Dạng danh sách ngang (Row Layout)
-        return `
-            <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition flex items-center justify-between gap-3">
-                <div class="flex items-center gap-3 flex-1 min-w-0">
-                    <div class="${sub ? 'bg-green-100 text-green-600' : 'bg-blue-50 text-blue-600'} p-2 rounded-lg flex-shrink-0">
-                        <i data-lucide="${sub ? 'check-circle' : 'book-open'}" class="w-5 h-5"></i>
-                    </div>
-                    <div class="min-w-0">
-                        <h4 class="text-sm font-bold text-slate-800 truncate leading-tight">${a.title}</h4>
-                        
-                        <p class="text-xs text-blue-600 mt-0.5 truncate font-medium">
-                            ${assignedClasses || 'Chưa giao lớp'}
-                        </p>
+                let actionBtn = '';
+                if (!isTeacher) { // Học sinh
+                    if (sub) actionBtn = `<button onclick="viewSubmissionResult('${sub.id}')" class="w-full bg-green-600 hover:bg-green-700 text-white py-2 rounded-lg font-medium text-sm">Xem kết quả (${sub.score}đ)</button>`;
+                    else actionBtn = `<button onclick="startAssignment('${a.id}')" class="w-full bg-blue-600 hover:bg-blue-700 text-white py-2 rounded-lg font-medium text-sm">Làm bài</button>`;
+                } else { // Giáo viên
+                    actionBtn = `
+                        <div class="flex gap-2 text-xs font-medium">
+                            <button onclick="viewAssignmentDetails('${a.id}')" class="flex-1 flex items-center justify-center gap-1 bg-yellow-500 hover:bg-yellow-600 text-white py-2 rounded-lg transition">
+                                <i data-lucide="eye" size="16"></i> Xem/Sửa
+                            </button>
+                            <button onclick="confirmDeleteAssignment('${a.id}', '${a.title}')" class="flex-1 flex items-center justify-center gap-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg transition">
+                                <i data-lucide="trash-2" size="16"></i> Xóa
+                            </button>
                         </div>
-                </div>
+                    `;
+                }
 
-                <div class="flex-shrink-0">
-                    ${actionBtn}
-                </div>
-            </div>
-        `;
-    }).join('');
+                return `
+                    <div class="bg-white p-5 rounded-xl shadow-md border border-slate-100 hover:shadow-lg transition">
+                        <div class="flex justify-between items-start mb-3">
+                            <div class="bg-blue-100 p-2 rounded-lg text-blue-600"><i data-lucide="book-open" size="20"></i></div>
+                            ${sub ? '<i data-lucide="check-circle" class="text-green-500 w-5 h-5"></i>' : ''}
+                        </div>
+                        <h4 class="text-lg font-bold text-slate-800 mb-1 truncate">${a.title}</h4>
+                        <p class="text-slate-500 text-sm mb-2">${a.questions.length} câu hỏi</p>
+                        ${isTeacher ? `<p class="text-xs text-blue-500 mb-4 truncate">Giao cho: ${assignedClasses || 'Chưa giao lớp nào'}</p>` : ''}
+                        ${actionBtn}
+                    </div>
+                `;
+            }).join('');
 
             return `
                 ${isTeacher ? 
                     `<button onclick="toggleCreate(true)" class="mb-6 bg-blue-600 hover:bg-blue-700 text-white px-5 py-2 md:px-6 md:py-3 rounded-xl font-bold shadow-md flex items-center gap-2 text-sm md:text-base">
                         <i data-lucide="plus-circle"></i> Tạo bài tập
                     </button>` : ''}
-<div class="flex flex-col gap-2 md:grid md:grid-cols-2 lg:grid-cols-4 md:gap-2">
-    ${list || `<p class="text-slate-500 text-center italic py-8">Không có bài tập nào.</p>`}
-</div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+                    ${list || `<p class="text-slate-500">${isTeacher ? 'Bạn chưa tạo bài tập nào.' : 'Chưa có bài tập nào được giao cho lớp của bạn.'}</p>`}
+                </div>
             `;
         };
         
@@ -1597,42 +1556,35 @@ const list = assignmentsList.map(a => {
 
             const myBanks = state.data.questionBanks.filter(b => b.createdBy === state.user.uid);
             
-const list = myBanks.map(bank => `
-                <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-100 hover:shadow-md transition flex items-center justify-between gap-3">
-                    
-                    <div class="flex items-center gap-3 flex-1 min-w-0">
-                        <div class="bg-purple-50 text-purple-600 p-2 rounded-lg flex-shrink-0">
-                            <i data-lucide="library" class="w-5 h-5"></i>
-                        </div>
-                        <div class="min-w-0">
-                            <h4 class="text-sm font-bold text-slate-800 truncate">${bank.title}</h4>
-                            <p class="text-xs text-slate-500 mt-0.5">${bank.questions.length} câu hỏi</p>
-                        </div>
+            const list = myBanks.map(bank => `
+                <div class="bg-white p-5 rounded-xl shadow-md border border-slate-100 hover:shadow-lg transition">
+                    <div class="flex justify-between items-start mb-3">
+                        <div class="bg-purple-100 p-2 rounded-lg text-purple-600"><i data-lucide="library" size="20"></i></div>
                     </div>
-
-                    <div class="flex gap-2 flex-shrink-0">
-                        <button onclick="viewBankDetails('${bank.id}')" class="p-2 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition" title="Xem/Sửa">
-                            <i data-lucide="eye" size="18"></i>
-                        </button>
-                        <button onclick="confirmDeleteBank('${bank.id}', '${bank.title}')" class="p-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 transition" title="Xóa">
-                            <i data-lucide="trash-2" size="18"></i>
+                    <h4 class="text-lg font-bold text-slate-800 mb-1 truncate">${bank.title}</h4>
+                    <p class="text-slate-500 text-sm mb-4">${bank.questions.length} câu hỏi</p>
+                    <div class="flex gap-2 text-sm font-medium">
+                        <button onclick="viewBankDetails('${bank.id}')" class="flex-1 flex items-center justify-center gap-1 bg-purple-500 hover:bg-purple-600 text-white py-2 rounded-lg transition">
+                            <i data-lucide="eye" size="16"></i> Xem/Sửa
+                            </button>
+                        <button onclick="confirmDeleteBank('${bank.id}', '${bank.title}')" class="flex-1 flex items-center justify-center gap-1 bg-red-500 hover:bg-red-600 text-white py-2 rounded-lg transition">
+                            <i data-lucide="trash-2" size="16"></i> Xóa
                         </button>
                     </div>
                 </div>
             `).join('');
 
-                return `
-                <div class="flex flex-wrap gap-3 mb-4">
-                    <button onclick="setBankMode('create')" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-xl font-bold shadow-md flex items-center gap-2 text-sm">
-                        <i data-lucide="plus-circle" size="18"></i> Tạo Ngân hàng đề
+            return `
+                <div class="flex flex-wrap gap-4 mb-6">
+                    <button onclick="setBankMode('create')" class="bg-purple-600 hover:bg-purple-700 text-white px-5 py-2 md:px-6 md:py-3 rounded-xl font-bold shadow-md flex items-center gap-2 text-sm md:text-base">
+                        <i data-lucide="plus-circle"></i> Tạo Ngân hàng đề mới
                     </button>
-                    <button onclick="toggleImportData(true)" class="bg-yellow-600 hover:bg-yellow-700 text-white px-4 py-2 rounded-xl font-bold shadow-md flex items-center gap-2 text-sm">
-                        <i data-lucide="file-text" size="18"></i> Nhập dữ liệu
+                    <button onclick="toggleImportData(true)" class="bg-yellow-600 hover:bg-yellow-700 text-white px-5 py-2 md:px-6 md:py-3 rounded-xl font-bold shadow-md flex items-center gap-2 text-sm md:text-base">
+                        <i data-lucide="file-text"></i> Nhập dữ liệu
                     </button>
                 </div>
-
-                <div class="grid grid-cols-1 lg:grid-cols-3 gap-2">
-                    ${list || '<p class="text-slate-500 text-center col-span-full py-4 bg-slate-50 rounded-xl border border-dashed border-slate-300">Bạn chưa tạo ngân hàng đề nào.</p>'}
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 lg:gap-6">
+                    ${list || '<p class="text-slate-500">Bạn chưa tạo ngân hàng đề nào.</p>'}
                 </div>
             `;
         };
@@ -2271,7 +2223,7 @@ const list = myBanks.map(bank => `
                     break;
                     
                 case 'jumble':
-                    header = `Sắp xếp các từ thành câu đúng:`;
+                    header = `Sắp xếp các từ để tạo thành câu đúng:`;
                     const availableWords = q.shuffledWords || q.answer; 
                     const placedWords = window.getJumbleAnswer(qIdx);
                     

@@ -174,6 +174,7 @@ input, textarea, select {
                 takingAssignmentId: null,
                 currentQuestionIndex: 0,
                 assignmentAnswers: {},
+                isTyping: false,
                 newAssignment: { title: '', questions: [], selectedClassIds: [] }, 
                 activeMatch: null,
                 matchQIndex: 0,
@@ -2296,19 +2297,24 @@ input, textarea, select {
             
 if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(q.type)) {
     const initialValue = userAnswer || '';
+    
+    // ĐỂ TRÁNH MẤT FOCUS, DÙNG onblur THAY VÌ oninput
     content = `
         <div class="text-center mt-6">
-            <input type="text" id="${inputId}" 
-                onchange="captureInputAnswer(${qIdx}, this.value)" 
-                oninput="captureInputAnswer(${qIdx}, this.value)" 
-                value="${initialValue}"
+            <input type="text" 
+                id="${inputId}" 
+                data-qidx="${qIdx}"
+                value="${initialValue.replace(/"/g, '&quot;')}"
                 class="w-full max-w-lg p-3 md:p-4 text-lg md:text-xl border-2 border-slate-300 rounded-xl focus:border-blue-500 outline-none text-center font-bold" 
                 placeholder="${placeholderText}" 
                 autocomplete="off"
                 autocorrect="off"
                 autocapitalize="off"
                 spellcheck="false"
-                inputmode="text" />
+                inputmode="text"
+                onfocus="handleInputFocus(${qIdx})"
+                onblur="handleInputBlur(${qIdx}, this.value)"
+                onkeyup="handleInputKeyup(${qIdx}, this.value)" />
         </div>
     `;
 }
@@ -4228,12 +4234,14 @@ if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(q.type))
         };
         
 window.captureInputAnswer = (qIdx, value) => { 
-    state.ui.assignmentAnswers[qIdx] = value; 
+    state.ui.assignmentAnswers[qIdx] = value;
+    state.ui.isTyping = true; // Đánh dấu đang gõ
     
-    // CRITICAL: Chặn re-render không cần thiết
-    if (document.activeElement && document.activeElement.tagName === 'INPUT') {
-        return; // Không làm gì nếu input đang focus
-    }
+    // Xóa flag sau 500ms không gõ
+    clearTimeout(window._typingTimer);
+    window._typingTimer = setTimeout(() => {
+        state.ui.isTyping = false;
+    }, 500);
 };
 
         

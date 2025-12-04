@@ -108,6 +108,29 @@
                  createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, addDoc, updateDoc, onSnapshot, serverTimestamp, query, where, getDocs, deleteDoc, runTransaction, arrayRemove, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-storage.js"; // THÊM FIREBASE STORAGE
+/
+/ --- BỔ SUNG: HÀM AUTO FOCUS ĐỂ FIX LỖI NHÁY MÀN HÌNH TRÊN MOBILE ---
+window.autoFocusInput = (qIndex, qType) => {
+    // Chỉ xử lý cho các loại câu hỏi nhập liệu
+    if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(qType)) {
+        const inputId = `input-q-${qIndex}`;
+        
+        // **Quan trọng:** Tăng độ trễ lên 200ms để chờ bàn phím ảo ổn định
+        setTimeout(() => {
+            const inputEl = document.getElementById(inputId);
+            if (inputEl) {
+                // Focus vào ô nhập liệu
+                inputEl.focus();
+                // Cuộn ô nhập liệu vào giữa màn hình, tránh bị bàn phím che
+                inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+        }, 200); 
+    }
+};
+
+
+
+
 
         // --- 1. CONFIGURATION ---
         let appId, firebaseConfig;
@@ -2347,18 +2370,7 @@
             }
 
             renderIcons();
-if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(currentQ.type)) {
-                const inputId = `input-q-${qIndex}`;
-                // Sử dụng setTimeout để đảm bảo DOM đã render xong trước khi focus
-                setTimeout(() => {
-                    const inputEl = document.getElementById(inputId);
-                    if (inputEl) {
-                        inputEl.focus();
-                        // Thêm scrollIntoView để đảm bảo input không bị bàn phím che mất
-                        inputEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                    }
-                }, 100); 
-            }
+window.autoFocusInput(qIndex, currentQ.type);
         };
 
 
@@ -2384,16 +2396,7 @@ if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(currentQ
             const isLast = qIndex === totalQuestions - 1;
 
             const questionHtml = renderTakeAssignmentQuestion(currentQ, qIndex);
-if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(currentQ.type)) {
-                const inputId = `input-q-${qIndex}`;
-                // Sử dụng setTimeout ngắn để DOM render xong rồi mới focus
-                setTimeout(() => {
-                    const inputEl = document.getElementById(inputId);
-                    if (inputEl) {
-                        inputEl.focus();
-                    }
-                }, 100); 
-            }
+window.autoFocusInput(qIndex, currentQ.type);
             return `
                 <div class="max-w-3xl mx-auto bg-white p-4 md:p-8 rounded-2xl shadow-lg fade-in">
                     <div class="flex justify-between items-center mb-6 pb-4 border-b">

@@ -1464,35 +1464,24 @@ return `
                 </button>
             `;
 
-return `
+            return `
                 <div class="max-w-7xl mx-auto bg-white p-4 md:p-8 rounded-2xl shadow-lg fade-in">
-                    
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 border-b pb-4 gap-4">
-                        
-                        <div class="flex items-center gap-2 w-full md:w-auto flex-1 mr-4">
+                    <div class="flex justify-between items-start mb-6 border-b pb-4">
+                        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 w-full pr-4">
                             <input id="edit-class-title" type="text" value="${classData.title}" 
-                                    class="text-2xl md:text-3xl font-bold border-b-2 border-transparent hover:border-blue-200 focus:border-blue-500 outline-none p-1 bg-transparent w-full">
-                            <button onclick="handleUpdateClassTitle('${classData.id}')" class="p-2 text-blue-500 hover:bg-blue-50 rounded-lg transition flex-shrink-0" title="Lưu tên lớp">
+                                    class="text-2xl md:text-3xl font-bold border-b-2 border-transparent hover:border-blue-200 focus:border-blue-500 outline-none p-1 w-full sm:w-auto min-w-[150px] truncate">
+                            <button onclick="handleUpdateClassTitle('${classData.id}')" class="text-blue-500 hover:text-blue-700 flex-shrink-0">
                                 <i data-lucide="save" size="24"></i>
                             </button>
                         </div>
-
-                        <div class="flex items-center gap-3 self-end md:self-center">
-                            
-                            <button onclick="copyToClipboard('${classData.classCode}', 'Mã lớp')" 
-                                    class="group flex items-center gap-2 bg-green-50 border border-green-200 text-green-700 px-3 py-1.5 rounded-lg hover:bg-green-100 hover:shadow-sm transition cursor-pointer"
-                                    title="Nhấn để sao chép mã lớp">
-                                <span class="text-xs font-bold uppercase text-green-600 tracking-wider">Mã lớp:</span>
-                                <span class="font-mono text-lg font-black tracking-widest">${classData.classCode}</span>
-                                <i data-lucide="copy" size="14" class="opacity-50 group-hover:opacity-100 transition"></i>
-                            </button>
-
-                            <button onclick="viewClass(null)" class="p-2 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition flex-shrink-0">
-                                <i data-lucide="x" size="24"></i>
-                            </button>
-                        </div>
+                        <button onclick="viewClass(null)" class="text-slate-500 hover:text-red-500 flex-shrink-0"><i data-lucide="x"></i></button>
                     </div>
                     
+                    <div class="bg-green-50 text-green-800 p-4 rounded-xl mb-6 font-bold text-base md:text-lg flex justify-between items-center">
+                        Mã lớp: 
+                        <span class="text-xl md:text-2xl text-green-700">${classData.classCode || 'N/A'}</span>
+                    </div>
+
                     <div class="flex gap-2 md:gap-4 mb-8">
                         ${nav('students', 'users', `Học sinh`)}
                         ${nav('assignments', 'clipboard-list', 'Bài tập')}
@@ -4304,17 +4293,7 @@ const list = myBanks.map(bank => `
             }
         };
 
-// Hàm hỗ trợ Copy (Thêm mới)
-        window.copyToClipboard = (text, label = 'Nội dung') => {
-            if (navigator.clipboard && window.isSecureContext) {
-                navigator.clipboard.writeText(text).then(() => {
-                    showToast(`Đã sao chép ${label}: ${text}`);
-                });
-            } else {
-                // Fallback cho một số trình duyệt cũ hoặc không bảo mật
-                showToast(`Mã lớp: ${text} (Hãy copy thủ công)`);
-            }
-        };
+
         window.submitAssignment = async () => {
             const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
             let score = 0;

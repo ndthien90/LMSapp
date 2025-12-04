@@ -4227,10 +4227,13 @@ if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(q.type))
             }
         };
         
-        //window.captureInputAnswer = (qIdx, value) => { state.ui.assignmentAnswers[qIdx] = value; };
-       window.captureInputAnswer = (qIdx, value) => { 
+window.captureInputAnswer = (qIdx, value) => { 
     state.ui.assignmentAnswers[qIdx] = value; 
-    // KHÔNG re-render để tránh mất focus
+    
+    // CRITICAL: Chặn re-render không cần thiết
+    if (document.activeElement && document.activeElement.tagName === 'INPUT') {
+        return; // Không làm gì nếu input đang focus
+    }
 };
 
         

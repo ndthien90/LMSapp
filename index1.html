@@ -7,6 +7,14 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
+        /* FIX QUAN TRỌNG CHO MOBILE VÀ KEYBOARD: 
+           Đảm bảo html/body cố định chiều cao viewport để bàn phím ảo không làm rung lắc giao diện chính.
+        */
+        html, body {
+            height: 100vh; /* Cố định chiều cao theo viewport */
+            overflow: hidden; /* Ngăn cuộn tổng thể */
+        }
+        
         /* Custom scrollbar for better look */
         ::-webkit-scrollbar { width: 8px; }
         ::-webkit-scrollbar-track { background: #f1f5f9; }
@@ -88,24 +96,9 @@
                 padding-left: 0.5rem;
             }
         }
-/* FIX: Ngăn zoom khi focus input trên iOS */
-@media screen and (max-width: 768px) {
-    input[type="text"],
-    input[type="email"],
-    input[type="password"],
-    select,
-    textarea {
-        font-size: 16px !important; /* iOS không zoom nếu font-size >= 16px */
-    }
-}
-
-/* Ngăn iOS adjust text size tự động */
-input, textarea, select {
-    -webkit-text-size-adjust: 100%;
-}
     </style>
 </head>
-<body class="bg-slate-50 text-slate-900 font-sans h-screen overflow-hidden">
+<body class="bg-slate-50 text-slate-900 font-sans h-full w-full overflow-hidden">
 
     <div id="app" class="h-full w-full"></div>
 
@@ -174,7 +167,6 @@ input, textarea, select {
                 takingAssignmentId: null,
                 currentQuestionIndex: 0,
                 assignmentAnswers: {},
-                isTyping: false,
                 newAssignment: { title: '', questions: [], selectedClassIds: [] }, 
                 activeMatch: null,
                 matchQIndex: 0,
@@ -2295,29 +2287,18 @@ input, textarea, select {
                     break;
             }
             
-if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(q.type)) {
-    const initialValue = userAnswer || '';
-    
-    // ĐỂ TRÁNH MẤT FOCUS, DÙNG onblur THAY VÌ oninput
-    content = `
-        <div class="text-center mt-6">
-            <input type="text" 
-                id="${inputId}" 
-                data-qidx="${qIdx}"
-                value="${initialValue.replace(/"/g, '&quot;')}"
-                class="w-full max-w-lg p-3 md:p-4 text-lg md:text-xl border-2 border-slate-300 rounded-xl focus:border-blue-500 outline-none text-center font-bold" 
-                placeholder="${placeholderText}" 
-                autocomplete="off"
-                autocorrect="off"
-                autocapitalize="off"
-                spellcheck="false"
-                inputmode="text"
-                onfocus="handleInputFocus(${qIdx})"
-                onblur="handleInputBlur(${qIdx}, this.value)"
-                onkeyup="handleInputKeyup(${qIdx}, this.value)" />
-        </div>
-    `;
-}
+            if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(q.type)) {
+                const initialValue = userAnswer || '';
+                content = `
+                    <div class="text-center mt-6">
+                        <input type="text" id="${inputId}" 
+                            oninput="captureInputAnswer(${qIdx}, this.value)" 
+                            value="${initialValue}"
+                            class="w-full max-w-lg p-3 md:p-4 text-lg md:text-xl border-2 border-slate-300 rounded-xl focus:border-blue-500 outline-none text-center font-bold" 
+                            placeholder="${placeholderText}" />
+                    </div>
+                `;
+            }
 
 
             return `
@@ -2331,70 +2312,50 @@ if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(q.type))
 
         // --- HÀM CẬP NHẬT UI CỤC BỘ CHO CHẾ ĐỘ LÀM BÀI TẬP (FIX SCROLL JUMP) ---
         window.updateAssignmentQuestionUI = (assign, qIndex) => {
-    const questionEl = document.getElementById('assignment-question-content');
-    if (!questionEl) return;
-    
-    // LƯU TRẠNG THÁI FOCUS TRƯỚC KHI RE-RENDER
-    const activeElement = document.activeElement;
-    const wasInputFocused = activeElement && activeElement.tagName === 'INPUT';
-    const focusedInputId = wasInputFocused ? activeElement.id : null;
-    const cursorPosition = wasInputFocused ? activeElement.selectionStart : null;
-    
-    const totalQuestions = assign.questions.length;
-    const currentQ = assign.questions[qIndex];
-    const questionHtml = renderTakeAssignmentQuestion(currentQ, qIndex);
+            const questionEl = document.getElementById('assignment-question-content');
+            if (!questionEl) return;
+            
+            const totalQuestions = assign.questions.length;
+            const currentQ = assign.questions[qIndex];
+            const questionHtml = renderTakeAssignmentQuestion(currentQ, qIndex);
 
-    // Gán lại nội dung câu hỏi
-    questionEl.innerHTML = questionHtml;
-    
-    // KHÔI PHỤC FOCUS NẾU INPUT ĐANG ĐƯỢC FOCUS
-    if (wasInputFocused && focusedInputId) {
-        const inputEl = document.getElementById(focusedInputId);
-        if (inputEl) {
-            // Delay nhỏ để đảm bảo DOM đã render xong
-            setTimeout(() => {
-                inputEl.focus();
-                if (cursorPosition !== null) {
-                    inputEl.setSelectionRange(cursorPosition, cursorPosition);
-                }
-            }, 10);
-        }
-    }
-    
-    // Cập nhật bộ đếm
-    document.getElementById('assignment-q-counter').textContent = `Câu hỏi ${qIndex + 1} / ${totalQuestions}`;
+            // Gán lại nội dung câu hỏi
+            questionEl.innerHTML = questionHtml;
+            
+            // Cập nhật bộ đếm
+            document.getElementById('assignment-q-counter').textContent = `Câu hỏi ${qIndex + 1} / ${totalQuestions}`;
 
-    // Cập nhật nút điều hướng
-    const isFirst = qIndex === 0;
-    const isLast = qIndex === totalQuestions - 1;
-    
-    const prevBtn = document.getElementById('prev-q-btn');
-    const nextContainer = document.getElementById('next-q-btn-container');
+            // Cập nhật nút điều hướng
+            const isFirst = qIndex === 0;
+            const isLast = qIndex === totalQuestions - 1;
+            
+            const prevBtn = document.getElementById('prev-q-btn');
+            const nextContainer = document.getElementById('next-q-btn-container');
 
-    if (prevBtn) {
-        prevBtn.disabled = isFirst;
-        prevBtn.classList.toggle('text-slate-400', isFirst);
-        prevBtn.classList.toggle('cursor-not-allowed', isFirst);
-        prevBtn.classList.toggle('bg-slate-100', isFirst);
-        prevBtn.classList.toggle('bg-slate-200', !isFirst);
-        prevBtn.classList.toggle('hover:bg-slate-300', !isFirst);
-    }
+            if (prevBtn) {
+                prevBtn.disabled = isFirst;
+                prevBtn.classList.toggle('text-slate-400', isFirst);
+                prevBtn.classList.toggle('cursor-not-allowed', isFirst);
+                prevBtn.classList.toggle('bg-slate-100', isFirst);
+                prevBtn.classList.toggle('bg-slate-200', !isFirst);
+                prevBtn.classList.toggle('hover:bg-slate-300', !isFirst);
+            }
 
-    if (nextContainer) {
-        nextContainer.innerHTML = isLast ? `
-            <button onclick="submitAssignment()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-xl font-bold text-lg shadow-lg transition">
-                <i data-lucide="send" size="20" class="inline-block mr-1"></i> Nộp bài
-            </button>
-        ` : `
-            <button id="next-q-btn" onclick="goToNextQuestion()" 
-                class="flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition bg-blue-600 hover:bg-blue-700 text-white">
-                Tiến <i data-lucide="arrow-right" size="20"></i>
-            </button>
-        `;
-    }
+            if (nextContainer) {
+                nextContainer.innerHTML = isLast ? `
+                    <button onclick="submitAssignment()" class="flex-1 bg-green-600 hover:bg-green-700 text-white py-3 px-6 rounded-xl font-bold text-lg shadow-lg transition">
+                        <i data-lucide="send" size="20" class="inline-block mr-1"></i> Nộp bài
+                    </button>
+                ` : `
+                    <button id="next-q-btn" onclick="goToNextQuestion()" 
+                        class="flex items-center gap-2 px-6 py-3 rounded-xl font-bold transition bg-blue-600 hover:bg-blue-700 text-white">
+                        Tiến <i data-lucide="arrow-right" size="20"></i>
+                    </button>
+                `;
+            }
 
-    renderIcons();
-};
+            renderIcons();
+        };
 
 
         const renderTakeAssignment = () => {
@@ -2581,9 +2542,9 @@ if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(q.type))
                         <i data-lucide="trophy" class="w-10 h-10 md:w-12 md:h-12 mx-auto drop-shadow-lg mb-2"></i>
                         <h3 class="text-2xl md:text-3xl font-bold">Bảng Xếp Hạng Điểm</h3>
                     </div>
-                    <div class="p-1 md:p-1">
+                    <div class="p-4 md:p-6">
                         <div class="overflow-x-auto">
-                            <table class="w-full min-w-[200px]">
+                            <table class="w-full min-w-[500px]">
                                 <thead>
                                     <tr class="text-left text-slate-500 text-sm border-b bg-slate-50">
                                         <th class="pb-3 pl-4 pt-3 w-16">Hạng</th>
@@ -2600,8 +2561,7 @@ if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(q.type))
                                                 ${renderMedal(idx+1)}
                                             </td>
                                             <td class="py-3 md:py-4 flex items-center gap-3">
-                                                <!--${renderAvatar(u, 'w-6 h-6', 'text-sm')} -->
-                                                ${renderAvatar(u, 'w-6 h-6', 'text-sm')}
+                                                ${renderAvatar(u, 'w-10 h-10', 'text-base')}
                                                 <span class="font-medium ${isMe ? 'text-blue-700' : 'text-slate-700'} truncate">${u.name} ${isMe ? '(Bạn)' : ''}</span>
                                             </td>
                                             <td class="py-3 md:py-4 text-right pr-4 font-bold text-lg md:text-xl text-yellow-600">${u.points || 0}</td>
@@ -4149,6 +4109,10 @@ if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(q.type))
 
         // --- CÁC HÀM ĐIỀU HƯỚNG BÀI LÀM (FIX SCROLL JUMP) ---
         window.goToNextQuestion = () => {
+const currentInput = document.getElementById(`input-q-${state.ui.currentQuestionIndex}`);
+if (currentInput) {
+    state.ui.assignmentAnswers[state.ui.currentQuestionIndex] = currentInput.value;
+}
             const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
             if (!assign) return;
 
@@ -4233,17 +4197,9 @@ if (['fib', 'translation', 'listen_write', 'listen_translate'].includes(q.type))
             }
         };
         
-window.captureInputAnswer = (qIdx, value) => { 
-    state.ui.assignmentAnswers[qIdx] = value;
-    state.ui.isTyping = true; // Đánh dấu đang gõ
-    
-    // Xóa flag sau 500ms không gõ
-    clearTimeout(window._typingTimer);
-    window._typingTimer = setTimeout(() => {
-        state.ui.isTyping = false;
-    }, 500);
-};
-
+        // Không làm gì cả khi gõ phím. Giá trị sẽ được đọc khi người dùng chuyển câu/nộp bài.
+       window.captureInputAnswer = (qIdx, value) => {};
+        window.getJumbleAnswer = (qIdx) => { return state.ui.assignmentAnswers[qIdx] || []; };
         
         // FIX SCROLL JUMP: Cập nhật UI cục bộ
         window.addJumbleWord = (qIdx, word) => { 
@@ -4293,6 +4249,10 @@ window.captureInputAnswer = (qIdx, value) => {
 
         window.submitAssignment = async () => {
             const assign = state.data.assignments.find(a => a.id === state.ui.takingAssignmentId);
+            const currentInput = document.getElementById(`input-q-${state.ui.currentQuestionIndex}`);
+if (currentInput) {
+    state.ui.assignmentAnswers[state.ui.currentQuestionIndex] = currentInput.value;
+}
             let score = 0;
             const totalQuestions = assign.questions.length;
             const scorePerQuestion = 100 / totalQuestions;

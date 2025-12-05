@@ -103,8 +103,7 @@
 
 
     <script type="module">
-         import { initializeApp, deleteApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        //import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithCustomToken, onAuthStateChanged, signOut, signInAnonymously,
                  createUserWithEmailAndPassword, signInWithEmailAndPassword } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, doc, setDoc, addDoc, updateDoc, onSnapshot, serverTimestamp, query, where, getDocs, deleteDoc, runTransaction, arrayRemove, arrayUnion } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
@@ -195,8 +194,6 @@
                 // --- MỚI: Student Class View State ---
                 viewMyClassId: null, // ID của lớp học sinh đang xem chi tiết
                 isJoiningClass: false, // Trạng thái modal nhập mã lớp
-                isBulkModalOpen: false,
-                isBulkCreating: false,
             },
             isAuthReady: false,
             initialAuthToken: typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null,
@@ -715,7 +712,6 @@ window.addEventListener('resize', () => {
                 appEl.innerHTML = renderAuthScreen();
                 // Đảm bảo modal avatar được ẩn khi ở màn hình đăng nhập
                 modalEl.innerHTML = '';
-                renderIcons();
             } else {
                 // Giữ lại layout chính (Sidebar + Header + Bottom Nav) nếu đã tồn tại
                 if (!document.getElementById('main-layout-wrapper')) {
@@ -750,14 +746,13 @@ window.addEventListener('resize', () => {
         
         // --- 6. RENDERERS ---
 
-const renderAuthScreen = () => {
+        const renderAuthScreen = () => {
             const isRegister = state.ui.authMode === 'register';
-            // Lấy role hiện tại để giữ trạng thái khi render lại
             const currentRole = document.querySelector('input[name="role"]:checked')?.value || 'student';
             
             return `
-                <div class="min-h-screen bg-slate-900 flex items-center justify-center p-4 relative">
-                    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md fade-in relative z-10">
+                <div class="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+                    <div class="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md fade-in">
                         <div class="text-center mb-8">
                             <div class="bg-blue-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
                                 <i data-lucide="book-open" class="text-white w-8 h-8"></i>
@@ -765,9 +760,7 @@ const renderAuthScreen = () => {
                             <h1 class="text-3xl font-bold text-slate-800">EduBattle</h1>
                             <p class="text-slate-500">Nền tảng học tập & thi đấu</p>
                         </div>
-                        
                         <h2 class="text-2xl font-bold text-slate-800 mb-6 text-center">${isRegister ? 'Đăng ký tài khoản mới' : 'Đăng nhập'}</h2>
-                        
                         <form onsubmit="${isRegister ? 'handleRegister(event)' : 'handleLogin(event)'}" class="space-y-4">
                             ${isRegister ? `
                                 <div><input id="join-name" type="text" required class="w-full p-3 border rounded-lg focus:ring-blue-500 focus:border-blue-500" placeholder="Họ và tên"></div>
@@ -793,83 +786,13 @@ const renderAuthScreen = () => {
                                 <button type="submit" class="w-full bg-green-600 hover:bg-green-700 text-white py-3 rounded-lg font-bold shadow-lg transition transform hover:-translate-y-0.5">Đăng nhập</button>
                             `}
                         </form>
-
                         <div class="mt-6 pt-4 border-t text-center text-sm">
                             <button onclick="setAuthMode('${isRegister ? 'login' : 'register'}')" class="font-bold text-blue-600 hover:text-blue-700 transition">
                                 ${isRegister ? 'Đã có tài khoản? Đăng nhập' : 'Chưa có tài khoản? Đăng ký ngay'}
                             </button>
                         </div>
-                        
-                        <div class="mt-4 text-center">
-                            <button onclick="toggleBulkModal(true)" class="text-xs text-slate-500 underline hover:text-purple-600 transition">
-                                <i data-lucide="users" size="14" class="inline"></i> Tạo tài khoản học sinh hàng loạt (GV)
-                            </button>
-                        </div>
                     </div>
-
-${state.ui.isBulkModalOpen ? `
-                    <div class="fixed inset-0 bg-black bg-opacity-80 flex items-center justify-center z-50 p-4 fade-in">
-                        <div class="bg-white rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 md:p-8 relative">
-                            
-                            <div class="flex justify-between items-center mb-6 border-b pb-4 sticky top-0 bg-white z-10">
-                                <h3 class="text-2xl font-bold text-purple-700">Tạo tài khoản hàng loạt</h3>
-                                        <button onclick="toggleBulkModal(false)" 
-                                        class="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-red-100 hover:text-red-600 transition shadow-sm"
-                                        title="Đóng">
-                                    <i data-lucide="x" size="16"></i>
-                                </button>
-                            </div>
-
-                            <div class="space-y-4">
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    <div>
-                                        <label class="block text-sm font-bold text-slate-700 mb-1">Mã Giáo Viên (*)</label>
-                                        <input id="bulk-teacher-code" type="text" class="w-full p-2 border rounded-lg focus:border-purple-500" placeholder="Nhập: ruands10">
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-bold text-slate-700 mb-1">Mật khẩu chung (*)</label>
-                                        <input id="bulk-password" type="text" class="w-full p-2 border rounded-lg focus:border-purple-500" placeholder="VD: 123456">
-                                    </div>
-                                </div>
-
-                                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-blue-50 p-4 rounded-xl border border-blue-100">
-                                    <div>
-                                        <label class="block text-sm font-bold text-blue-800 mb-1">Tên Lớp học (Làm đuôi Email)</label>
-                                        <input id="bulk-class-name" type="text" class="w-full p-2 border rounded-lg" placeholder="VD: HN1">
-                                        <p class="text-xs text-blue-600 mt-1">VD nhập "HN1" -> email: ten_hn1@gmail.com</p>
-                                    </div>
-                                    <div>
-                                        <label class="block text-sm font-bold text-blue-800 mb-1">Mã Lớp (Để tham gia)</label>
-                                        <input id="bulk-class-code" type="text" class="w-full p-2 border rounded-lg" placeholder="VD: 123456">
-                                        <p class="text-xs text-slate-500 mt-1">Mã để học sinh nhập vào khi tham gia lớp</p>
-                                    </div>
-                                </div>
-
-                                <div>
-                                    <label class="block text-sm font-bold text-slate-700 mb-1">Danh sách Học sinh (Mỗi tên 1 dòng)</label>
-                                    <textarea id="bulk-student-list" rows="5" class="w-full p-3 border rounded-lg font-medium" placeholder="Nguyễn Văn A&#10;Trần Thị B&#10;Lê Văn C"></textarea>
-                                </div>
-
-                               <div class="border-t pt-4">
-                                    <p class="text-sm font-bold text-slate-700 mb-2">Hoặc tải lên file CSV (Nâng cao)</p>
-                                    <input type="file" id="bulk-csv-file" accept=".csv" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"/>
-                                    <p class="text-xs text-blue-600 mt-1 font-bold">Cấu trúc: Tên HS, Email, Mã lớp, Tên lớp, Mật khẩu (Tùy chọn)</p>
-                                </div>
-
-                                <div class="flex gap-3 pt-4 border-t mt-4">
-                                    <button onclick="toggleBulkModal(false)" class="flex-1 py-3 rounded-xl font-bold text-slate-600 bg-slate-100 hover:bg-slate-200 transition">
-                                        Hủy bỏ
-                                    </button>
-                                    <button onclick="handleBulkCreate()" class="flex-[2] bg-purple-600 hover:bg-purple-700 text-white py-3 rounded-xl font-bold text-lg shadow-lg flex items-center justify-center gap-2 transition">
-                                        <i data-lucide="user-plus"></i> Bắt đầu tạo
-                                    </button>
-                                </div>
-                                
-                                <p id="bulk-status" class="text-center text-sm font-bold mt-2 text-slate-600"></p>
-                            </div>
-                        </div>
-                    </div>` : ''}
-                    </div>
+                </div>
             `;
         };
 
@@ -4531,7 +4454,6 @@ const list = myBanks.map(bank => `
 
         // Bootstrap
         onAuthStateChanged(auth, (u) => {
-            if (state.ui.isBulkCreating) return;
             state.user = u; state.isAuthReady = true;
             if(u) setupListeners(u.uid);
             else { state.profile = null; state.ui.authMode = 'login'; renderApp(); }
@@ -4570,234 +4492,6 @@ const list = myBanks.map(bank => `
                     submitAssignment(); // Tự động nộp bài
                 }
             }, 1000);
-        };
-// --- TIỆN ÍCH: Xóa dấu Tiếng Việt để tạo Email ---
-        window.removeVietnameseTones = (str) => {
-            str = str.replace(/à|á|ạ|ả|ã|â|ầ|ấ|ậ|ẩ|ẫ|ă|ằ|ắ|ặ|ẳ|ẵ/g,"a"); 
-            str = str.replace(/è|é|ẹ|ẻ|ẽ|ê|ề|ế|ệ|ể|ễ/g,"e"); 
-            str = str.replace(/ì|í|ị|ỉ|ĩ/g,"i"); 
-            str = str.replace(/ò|ó|ọ|ỏ|õ|ô|ồ|ố|ộ|ổ|ỗ|ơ|ờ|ớ|ợ|ở|ỡ/g,"o"); 
-            str = str.replace(/ù|ú|ụ|ủ|ũ|ư|ừ|ứ|ự|ử|ữ/g,"u"); 
-            str = str.replace(/ỳ|ý|ỵ|ỷ|ỹ/g,"y"); 
-            str = str.replace(/đ/g,"d");
-            str = str.replace(/À|Á|Ạ|Ả|Ã|Â|Ầ|Ấ|Ậ|Ẩ|Ẫ|Ă|Ằ|Ắ|Ặ|Ẳ|Ẵ/g, "A");
-            str = str.replace(/È|É|Ẹ|Ẻ|Ẽ|Ê|Ề|Ế|Ệ|Ể|Ễ/g, "E");
-            str = str.replace(/Ì|Í|Ị|Ỉ|Ĩ/g, "I");
-            str = str.replace(/Ò|Ó|Ọ|Ỏ|Õ|Ô|Ồ|Ố|Ộ|Ổ|Ỗ|Ơ|Ờ|Ớ|Ợ|Ở|Ỡ/g, "O");
-            str = str.replace(/Ù|Ú|Ụ|Ủ|Ũ|Ư|Ừ|Ứ|Ự|Ử|Ữ/g, "U");
-            str = str.replace(/Ỳ|Ý|Ỵ|Ỷ|Ỹ/g, "Y");
-            str = str.replace(/Đ/g, "D");
-            // Xóa ký tự đặc biệt và khoảng trắng dư thừa
-            str = str.replace(/!|@|%|\^|\*|\(|\)|\+|\=|\<|\>|\?|\/|,|\.|\:|\;|\'|\"|\&|\#|\[|\]|~|\$|_|`|-|{|}|\||\\/g," ");
-            str = str.replace(/ + /g," ");
-            str = str.trim(); 
-            return str.toLowerCase().replace(/\s/g, ''); // Chuyển thành chữ thường và xóa hết khoảng trắng
-        };
-        window.toggleBulkModal = (val) => {
-            state.ui.isBulkModalOpen = val;
-            renderApp();
-        };
-window.handleBulkCreate = async () => {
-            const teacherCode = document.getElementById('bulk-teacher-code').value.trim();
-            const globalPassword = document.getElementById('bulk-password').value.trim(); // Đổi tên biến cho rõ
-            const statusEl = document.getElementById('bulk-status');
-            
-            // 1. Validate
-            if (teacherCode !== 'ruands10') return showToast("Mã giáo viên không đúng!", "error");
-            if (globalPassword.length < 6) return showToast("Mật khẩu chung phải từ 6 ký tự trở lên", "error");
-
-            // 2. Lấy dữ liệu
-            let studentsToCreate = [];
-            let targetClassCode = '';
-            let targetClassName = '';
-
-            const csvFile = document.getElementById('bulk-csv-file').files[0];
-            
-            if (csvFile) {
-                // --- XỬ LÝ CSV NÂNG CẤP (Khớp với file tải về) ---
-                const text = await csvFile.text();
-                const rows = text.split('\n').slice(1); // Bỏ header
-                
-                rows.forEach(row => {
-                    // Tách bằng dấu phẩy, nhưng cẩn thận xử lý dấu ngoặc kép nếu có
-                    // Đơn giản hóa: Xóa hết dấu " trước khi split
-                    const cleanRow = row.replace(/"/g, ''); 
-                    const cols = cleanRow.split(',');
-                    
-                    if (cols.length >= 1 && cols[0].trim()) {
-                        studentsToCreate.push({
-                            name: cols[0]?.trim(),
-                            email: cols[1]?.trim(),
-                            classCode: cols[2]?.trim(),
-                            className: cols[3]?.trim(),
-                            password: cols[4]?.trim() // Lấy mật khẩu riêng từ CSV
-                        });
-                    }
-                });
-            } else {
-                // ... (Logic nhập tay Textarea giữ nguyên như cũ) ...
-                const rawNames = document.getElementById('bulk-student-list').value;
-                targetClassName = document.getElementById('bulk-class-name').value.trim();
-                targetClassCode = document.getElementById('bulk-class-code').value.trim().toUpperCase();
-
-                if (!rawNames || !targetClassName || !targetClassCode) {
-                    return showToast("Vui lòng nhập đủ Tên lớp, Mã lớp và Danh sách tên.", "error");
-                }
-
-                const names = rawNames.split('\n').filter(n => n.trim().length > 0);
-                studentsToCreate = names.map(name => {
-                    const cleanName = removeVietnameseTones(name);
-                    const cleanClass = removeVietnameseTones(targetClassName); 
-                    const autoEmail = `${cleanName}_${cleanClass}@gmail.com`;
-                    return { name: name.trim(), email: autoEmail };
-                });
-            }
-
-            if (studentsToCreate.length === 0) return showToast("Không tìm thấy học sinh nào để tạo.", "error");
-
-            // 3. BẮT ĐẦU QUY TRÌNH
-            state.ui.isBulkCreating = true; 
-            statusEl.classList.remove('text-red-500');
-            statusEl.classList.add('text-blue-600');
-
-            let successCount = 0;
-            let classErrorCount = 0;
-            let successList = []; 
-
-            try {
-                for (const st of studentsToCreate) {
-                    if (!st.name) continue;
-                    statusEl.textContent = `Đang xử lý: ${st.name}...`;
-
-                    // ƯU TIÊN: Mật khẩu riêng trong CSV > Mật khẩu chung
-                    const userPassword = (st.password && st.password.length >=6) ? st.password : globalPassword;
-
-                    try {
-                        // A. Tạo & Login
-                        const cred = await createUserWithEmailAndPassword(auth, st.email, userPassword);
-                        const uid = cred.user.uid;
-
-                        // B. Ghi Profile
-                        await setDoc(doc(db, getPath('users'), uid), {
-                            uid: uid,
-                            name: st.name,
-                            email: st.email,
-                            role: 'student',
-                            points: 0,
-                            avatarUrl: null,
-                            avatarType: null,
-                            createdAt: serverTimestamp()
-                        });
-
-                        // C. Xử lý Lớp học
-                        const currentClassCode = st.classCode || targetClassCode;
-                        const currentClassName = st.className || targetClassName;
-
-                        if (currentClassCode && currentClassName) {
-                            try {
-                                const q = query(getRef('classes'), where('classCode', '==', currentClassCode));
-                                const querySnapshot = await getDocs(q);
-
-                                if (!querySnapshot.empty) {
-                                    const classDoc = querySnapshot.docs[0];
-                                    await updateDoc(doc(db, getPath('classes'), classDoc.id), {
-                                        studentIds: arrayUnion(uid)
-                                    });
-                                } else {
-                                    await addDoc(getRef('classes'), {
-                                        title: currentClassName,
-                                        classCode: currentClassCode,
-                                        teacherId: 'pending_teacher', 
-                                        studentIds: [uid],
-                                        createdAt: serverTimestamp()
-                                    });
-                                }
-                            } catch (classErr) {
-                                console.warn(`Lỗi thêm lớp cho ${st.name}:`, classErr);
-                                classErrorCount++;
-                            }
-                        }
-
-                        // Lưu vào danh sách thành công (Kèm mật khẩu thực tế đã dùng)
-                        successList.push({
-                            name: st.name,
-                            email: st.email,
-                            classCode: currentClassCode || 'N/A',
-                            className: currentClassName || 'N/A',
-                            password: userPassword // Xuất lại mật khẩu để GV biết
-                        });
-
-                        successCount++;
-                    } catch (err) {
-                        console.error(`Lỗi tạo user ${st.name}:`, err);
-                    }
-
-                    // D. Đăng xuất
-                    await signOut(auth);
-                    await new Promise(r => setTimeout(r, 500)); // Delay để tránh lỗi Auth
-                }
-
-                // Kết thúc
-                statusEl.textContent = "Hoàn tất!";
-                let msg = `Đã tạo thành công ${successCount}/${studentsToCreate.length} tài khoản.`;
-                if (classErrorCount > 0) {
-                    msg += `\n(Có ${classErrorCount} lỗi khi thêm vào lớp - HS cần tự nhập mã lớp)`;
-                }
-                
-                // TỰ ĐỘNG TẢI FILE CSV
-                if (successList.length > 0) {
-                    // Tên file xuất ra: DS_TaiKhoan_NgayGio.csv
-                    const dateStr = new Date().toISOString().slice(0,10);
-                    downloadCSV(successList, `DS_TaiKhoan_${dateStr}.csv`);
-                    msg += `\n\nĐã tải xuống file danh sách tài khoản (kèm mật khẩu)!`;
-                }
-
-                alert(msg);
-
-            } catch (e) {
-                console.error("Bulk process error:", e);
-                showToast("Lỗi hệ thống: " + e.message, "error");
-            } finally {
-                state.ui.isBulkCreating = false;
-                toggleBulkModal(false);
-                state.ui.authMode = 'login';
-                renderApp(); 
-            }
-        };
-// --- TIỆN ÍCH: Xuất file CSV (Hỗ trợ Tiếng Việt cho Excel) ---
-        window.downloadCSV = (data, filename = 'danh_sach_tai_khoan.csv') => {
-            if (!data || data.length === 0) return;
-
-            // 1. Tạo Header
-            const headers = ["Tên Học Sinh", "Email", "Mã Lớp", "Tên Lớp", "Mật Khẩu"];
-            
-            // 2. Tạo nội dung các dòng (Bao quanh bằng dấu ngoặc kép để tránh lỗi nếu có dấu phẩy)
-            const csvRows = [
-                headers.join(','), 
-                ...data.map(row => [
-                    `"${row.name}"`,
-                    `"${row.email}"`,
-                    `"${row.classCode}"`,
-                    `"${row.className}"`,
-                    `"${row.password}"` // Lưu ý: Excel sẽ tự hiểu số, nhưng text nên để trong ngoặc kép
-                ].join(','))
-            ];
-
-            // 3. Kết hợp thành chuỗi
-            const csvString = csvRows.join('\n');
-
-            // 4. Tạo Blob với BOM (\uFEFF) để Excel hiển thị đúng Tiếng Việt
-            const blob = new Blob(["\uFEFF" + csvString], { type: 'text/csv;charset=utf-8;' });
-            
-            // 5. Tạo link ảo và kích hoạt tải về
-            const url = URL.createObjectURL(blob);
-            const link = document.createElement("a");
-            link.setAttribute("href", url);
-            link.setAttribute("download", filename);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
         };
         initAuth();
 
